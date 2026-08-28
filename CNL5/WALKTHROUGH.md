@@ -620,9 +620,9 @@ copy running-config startup-config
 
 Do not configure OSPF on Internet.
 
-If this old Packet Tracer image rejects `passive-interface default`, remove
-that line and explicitly make only these interfaces passive: R1 Fa0/0, R4
-Fa0/0, and R5 Fa1/0. Keep the same internal interfaces active.
+If the simulated IOS rejects `passive-interface default`, remove that line and
+explicitly make only these interfaces passive: R1 Fa0/0, R4 Fa0/0, and R5
+Fa1/0. Keep the same internal interfaces active.
 
 Screenshot checkpoints:
 
@@ -802,8 +802,16 @@ copy running-config startup-config
 
 Do not configure EIGRP on Internet.
 
-If `passive-interface default` is rejected, use the same explicit fallback as
-OSPF: R1 Fa0/0, R4 Fa0/0, and R5 Fa1/0 passive; internal links active.
+If `passive-interface default` is rejected, remove that line and the associated
+`no passive-interface` lines. Under `router eigrp 100`, configure R1 Fa0/0, R4
+Fa0/0, and R5 Fa1/0 as explicit passive interfaces. R2 and R3 have only
+internal router links and need no passive interface in this fallback.
+
+```text
+R1(config-router)# passive-interface FastEthernet0/0
+R4(config-router)# passive-interface FastEthernet0/0
+R5(config-router)# passive-interface FastEthernet1/0
+```
 
 Screenshot checkpoints:
 
@@ -813,34 +821,207 @@ Screenshot checkpoints:
 - `screenshots/eigrp/04-r4-eigrp-config.png`
 - `screenshots/eigrp/05-r5-eigrp-config.png`
 
+For each screenshot, run `show running-config` and show the complete
+`router eigrp 100` block, including AS 100, the network statement, and the
+active/passive interface choices. Include R5's redistribution metric in its
+screenshot.
+
 ## C2. Verify EIGRP convergence and Internet isolation
 
-On R1 and R4:
+What to expect: EIGRP sends Hellos to form adjacencies on the internal
+router-to-router interfaces, exchanges bounded route Updates, and uses DUAL to
+select a successor. With the equal baseline links, bandwidth and delay make
+the shorter R1-R5-R4 path preferable. R5 redistributes its static default, so
+other routers see that default as an external EIGRP route. Passive PC-facing
+interfaces advertise their connected LANs but send no EIGRP Hellos.
+
+Wait about 15 seconds after the last EIGRP command, then verify every layer in
+the order below. Do not move to RIP until all four checks pass.
+
+### C2.1 Verify EIGRP neighbors
+
+On R1:
 
 ```text
 show ip eigrp neighbors
-show ip route eigrp
-show ip route 0.0.0.0
 ```
+
+R1 must have exactly these two internal neighbors:
+
+| Neighbor address | Local interface | Device |
+|---|---|---|
+| `10.10.8.2` | Fa0/1 | R2 |
+| `10.10.11.2` | Fa1/0 | R5 |
+
+On R4:
+
+```text
+show ip eigrp neighbors
+```
+
+R4 must have exactly these two internal neighbors:
+
+| Neighbor address | Local interface | Device |
+|---|---|---|
+| `10.10.10.1` | Fa0/1 | R3 |
+| `10.10.12.2` | Fa1/0 | R5 |
 
 On R5:
 
 ```text
 show ip eigrp neighbors
-show ip eigrp interfaces
+```
+
+R5 must have R1 (`10.10.11.1`) on Fa0/0 and R4 (`10.10.12.1`) on Fa0/1.
+There must never be a neighbor on R5 Fa1/0.
+
+Also verify the two middle routers:
+
+```text
+R2# show ip eigrp neighbors
+R3# show ip eigrp neighbors
+```
+
+R2 must list R1 `10.10.8.1` on Fa0/0 and R3 `10.10.9.2` on Fa0/1. R3 must
+list R2 `10.10.9.1` on Fa0/0 and R4 `10.10.10.2` on Fa0/1. This proves every
+one of the five internal router-to-router links participates correctly.
+
+In `show ip eigrp neighbors`, `Hold` counts down and is refreshed by Hellos,
+`Uptime` should keep increasing, `SRTT` and `RTO` are EIGRP reliability timers
+rather than ping delay, and `Q Cnt` should normally be 0 after convergence.
+
+If a neighbor is missing, check these items on both ends of that link before
+changing anything else:
+
+```text
+show ip interface brief
+show running-config
+show ip protocols
+```
+
+The interfaces must be `up/up`, both routers must use EIGRP AS 100, the
+`network 10.10.0.0 0.0.255.255` command must exist, and the router-to-router
+interface must be listed after `no passive-interface`.
+
+### C2.2 Verify EIGRP routes and the redistributed default
+
+On R1:
+
+```text
+show ip route eigrp
+show ip route 10.10.16.0
+show ip route 0.0.0.0
+show ip eigrp topology 10.10.16.0 255.255.255.0
+```
+
+Expected baseline results:
+
+- the PC3 LAN `10.10.16.0/24` is marked `D` and uses R5 at `10.10.11.2`;
+- the default route is marked `D*EX` and uses R5 at `10.10.11.2`;
+- `D` means an internal EIGRP route, `EX` means an external route, and `*`
+  marks a candidate default route.
+
+The topology entry should be in state `P` (Passive), meaning the route is
+stable and not currently being recomputed. Record its successor count,
+feasible distance, and reported distance; `Passive` here is a DUAL state and
+is unrelated to the `passive-interface` command.
+
+On R4:
+
+```text
+show ip route eigrp
+show ip route 10.10.6.0
 show ip route 0.0.0.0
 ```
 
-R5 Fa1/0 must not appear in `show ip eigrp interfaces`. R1/R4 should learn an
-external EIGRP default route, normally marked `D*EX`.
+The PC1 LAN `10.10.6.0/24` must be a `D` route through R5 at
+`10.10.12.2`. The default must be `D*EX` through the same next hop.
 
-Repeat the Internet checks, PC1 pings, and R5 NAT checks from B2.
+On R5:
+
+```text
+show ip route 0.0.0.0
+show running-config
+```
+
+R5 itself must retain the static default `S* 0.0.0.0/0` through
+`213.80.11.5`. If R1/R4 have no `D*EX` default, check that R5 contains both
+the static default and this exact EIGRP command:
+
+```text
+redistribute static metric 100000 1000 255 1 1500
+```
+
+### C2.3 Prove the external interface is excluded
+
+On R5:
+
+```text
+show ip protocols
+show ip eigrp interfaces
+```
+
+Confirm AS 100 and the `10.10.0.0/16` network are shown. Fa0/0 and Fa0/1 are
+the only EIGRP router links; Fa1/0 and `213.80.11.0/24` must not appear as an
+active EIGRP interface/network.
+
+On Internet:
+
+```text
+show ip protocols
+show ip route
+```
+
+Expected result: no routing protocol, no `10.10.*` route, and only the
+connected/local `213.80.11.0/24` entries.
+
+### C2.4 Prove end-to-end forwarding and NAT
+
+From PC1, run each test separately:
+
+```text
+ping 10.10.6.2
+ping 10.10.11.2
+ping -n 20 10.10.16.1
+tracert 10.10.16.1
+ping -n 100 213.80.11.5
+tracert 213.80.11.5
+```
+
+Expected results:
+
+- the first two pings prove PC1 reaches its gateway and R5;
+- PC1-to-PC3 succeeds and normally uses R1-R5-R4 at baseline;
+- the Internet trace reaches R5 at `10.10.11.2` and then Internet;
+- a trace that reaches `10.10.11.2` and then times out points to R5 NAT, not
+  EIGRP.
+
+Immediately after the 100-packet Internet ping, run on R5:
+
+```text
+show ip nat statistics
+show access-lists
+show ip nat translations
+```
+
+The statistics must list Fa0/0 and Fa0/1 as inside and Fa1/0 as outside. ACL 1
+must show matches, and a translation must map PC1 `10.10.6.1` to R5
+`213.80.11.4`. If ACL matches stay at zero, recheck the NAT interface roles. If
+ACL matches increase but there is no translation, recheck the global
+`ip nat inside source list 1 interface FastEthernet1/0 overload` command.
+
+Save only after every expected result is present:
+
+```text
+copy running-config startup-config
+```
 
 Screenshot checkpoints:
 
-- `screenshots/eigrp/06-r1-neighbors-and-routes.png`
-- `screenshots/eigrp/07-r4-neighbors-and-routes.png`
-- `screenshots/eigrp/08-r5-external-interface-excluded.png`
+- `screenshots/eigrp/06-r1-neighbors-routes-and-default.png`
+- `screenshots/eigrp/06a-r2-and-r3-neighbors.png`
+- `screenshots/eigrp/07-r4-neighbors-routes-and-default.png`
+- `screenshots/eigrp/08-r5-default-and-external-interface-excluded.png`
 - `screenshots/eigrp/09-internet-still-isolated.png`
 - `screenshots/eigrp/10-pc1-internal-and-internet-ping.png`
 - `screenshots/eigrp/11-r5-nat-proof.png`
@@ -940,8 +1121,19 @@ copy running-config startup-config
 
 Do not configure RIP on Internet.
 
-If `passive-interface default` is rejected, use the explicit passive-interface
-fallback described in B1.
+If `passive-interface default` is rejected, remove that line and the matching
+`no passive-interface` lines. Configure only the PC-facing interfaces as
+passive on R1 and R4; R5 Fa1/0 is outside `network 10.0.0.0` but may also be
+made explicitly passive:
+
+```text
+R1(config-router)# passive-interface FastEthernet0/0
+R4(config-router)# passive-interface FastEthernet0/0
+R5(config-router)# passive-interface FastEthernet1/0
+```
+
+R2 and R3 have only internal router links, so neither needs an explicitly
+passive interface in this fallback.
 
 Screenshot checkpoints:
 
@@ -951,34 +1143,132 @@ Screenshot checkpoints:
 - `screenshots/rip/04-r4-rip-config.png`
 - `screenshots/rip/05-r5-rip-config.png`
 
+For each screenshot, run `show running-config` and display the complete
+`router rip` block. On R5, include `default-information originate`; on every
+router, make the active and passive interfaces readable.
+
 ## D2. Verify RIP convergence and Internet isolation
 
-Wait at least 35 seconds for a complete periodic update, then run on R1 and R4:
+Wait at least 35 seconds for a complete periodic update. RIP has no neighbor
+table, so use `show ip protocols`, its routing information sources, and the
+route table as the proof.
+
+### D2.1 Verify RIPv2 operation on R1 and R4
+
+On R1:
 
 ```text
 show ip protocols
 show ip route rip
+show ip route 10.10.16.0
 show ip route 0.0.0.0
 show ip rip database
 ```
 
-On R5, run:
+Confirm all of the following:
+
+- the protocol is RIP and sends/receives version 2;
+- automatic summarization is disabled;
+- `10.0.0.0` is the only configured RIP network;
+- Fa0/0, the PC1 LAN, is passive;
+- the routing information sources include R2 `10.10.8.2` and R5
+  `10.10.11.2` after updates arrive;
+- `10.10.16.0/24` is marked `R` through R5 at `10.10.11.2` with the lower
+  baseline hop count;
+- the default is marked `R*` through R5 at `10.10.11.2`.
+
+On R4:
+
+```text
+show ip protocols
+show ip route rip
+show ip route 10.10.6.0
+show ip route 0.0.0.0
+show ip rip database
+```
+
+R4's sources must include R3 `10.10.10.1` and R5 `10.10.12.2`. The PC1 LAN
+and default route must both prefer R5 at `10.10.12.2` in the baseline.
+
+On R2 and R3, run:
+
+```text
+show ip protocols
+show ip route rip
+```
+
+R2's routing sources must include R1 `10.10.8.1` and R3 `10.10.9.2`.
+R3's sources must include R2 `10.10.9.1` and R4 `10.10.10.2`. Together with
+the R1/R4 checks, this proves RIP updates cross every internal link.
+
+### D2.2 Verify R5's default and external-link exclusion
+
+On R5:
 
 ```text
 show ip protocols
 show ip route 0.0.0.0
+show running-config
 ```
 
-The external network must not be listed as a RIP network, and Fa1/0 must remain
-passive/excluded. R1/R4 should learn a RIP default route marked `R*`.
+Confirm that R5 retains `S* 0.0.0.0/0` through `213.80.11.5`, the RIP block
+contains `default-information originate`, and `213.80.11.0/24` is not a RIP
+network. Its routing sources must include R1 `10.10.11.1` and R4
+`10.10.12.1`. Fa1/0 must remain excluded from RIP updates.
 
-Repeat the Internet, PC1, and NAT checks from B2.
+On Internet:
+
+```text
+show ip protocols
+show ip route
+```
+
+Internet must have no RIP process and no `10.10.*` route. Its only network is
+the directly connected `213.80.11.0/24` LAN.
+
+### D2.3 Verify forwarding and NAT
+
+From PC1:
+
+```text
+ping 10.10.6.2
+ping 10.10.11.2
+ping -n 20 10.10.16.1
+tracert 10.10.16.1
+ping -n 100 213.80.11.5
+tracert 213.80.11.5
+```
+
+At baseline, PC1-to-PC3 should use R1-R5-R4 because RIP counts two hops on the
+lower path and three on the upper path. The Internet test must succeed through
+R5 NAT.
+
+Immediately afterward, on R5:
+
+```text
+show ip nat statistics
+show access-lists
+show ip nat translations
+```
+
+Require NAT hits and a `10.10.6.1` to `213.80.11.4` translation. If RIP routes
+are absent, wait another 35 seconds and recheck version 2, `network 10.0.0.0`,
+and passive interfaces. If the default alone is absent, check R5's static
+default plus `default-information originate`. If the trace reaches R5 and then
+stops, troubleshoot NAT rather than changing RIP.
+
+Save after all checks pass:
+
+```text
+copy running-config startup-config
+```
 
 Screenshot checkpoints:
 
-- `screenshots/rip/06-r1-routes-and-database.png`
-- `screenshots/rip/07-r4-routes-and-database.png`
-- `screenshots/rip/08-r5-external-interface-excluded.png`
+- `screenshots/rip/06-r1-protocol-routes-and-default.png`
+- `screenshots/rip/07-r4-protocol-routes-and-default.png`
+- `screenshots/rip/07a-r2-and-r3-sources-and-routes.png`
+- `screenshots/rip/08-r5-default-and-external-interface-excluded.png`
 - `screenshots/rip/09-internet-still-isolated.png`
 - `screenshots/rip/10-pc1-internal-and-internet-ping.png`
 - `screenshots/rip/11-r5-nat-proof.png`
@@ -992,46 +1282,62 @@ in one file.
 
 ## E1. Prepare the Simulation view
 
-For each file:
+Use the R2-R3 link for all three captures so the comparison uses the same
+source link. R2 Fa0/1 is `10.10.9.1`; R3 Fa0/0 is `10.10.9.2`.
 
-1. Click `Simulation` at the bottom right.
-2. Click `Edit Filters`.
-3. Click `Show None`, then enable only the current routing protocol:
-   `OSPF`, `EIGRP`, or `RIP`.
-4. Close the filter window.
-5. Click `Reset Simulation` or clear the Event List.
-6. Click `Auto Capture / Play`.
-7. For OSPF/EIGRP, wait for a periodic Hello. For RIP, wait up to 30 seconds
-   for a Response/update.
-8. Click a colored envelope or the Event List's PDU square.
-9. Open `Inbound PDU Details` or `Outbound PDU Details`.
-10. Expand both the IP header and the routing-protocol header.
+1. Save the current file before changing link state.
+2. In Realtime, confirm PC1 can still ping PC3.
+3. Click `Simulation` at the bottom right.
+4. Open `Edit Filters`, click `Show None`, and enable only the current routing
+   protocol: `OSPF`, `EIGRP`, or `RIP`.
+5. Clear the Event List.
+6. Click `Auto Capture / Play` and wait for a stable control packet: normally
+   up to 10 seconds for OSPF, about 5 seconds for EIGRP, or up to 30 seconds for
+   RIP.
+7. Pause playback as soon as the needed packet appears. Click its colored
+   square in the Event List, open `Inbound PDU Details` or
+   `Outbound PDU Details`, and expand the IP and routing-protocol headers.
 
-If an update packet does not appear, trigger one without leaving a link down:
+To force a topology-change packet, clear the Event List and shut only R2
+Fa0/1. Do not enter `no shutdown` in the same command sequence; Packet Tracer
+needs time to generate and display the failure event.
 
 ```text
-enable
-configure terminal
-interface FastEthernet0/1
- shutdown
- no shutdown
-end
+R2> enable
+R2# configure terminal
+R2(config)# interface FastEthernet0/1
+R2(config-if)# shutdown
+R2(config-if)# end
 ```
 
-Run that on R2 while Simulation mode is active, then wait until adjacency and
-routing recover.
+Use `Capture/Forward` until the routing update caused by the shutdown is
+visible. After capturing it, restore the link:
+
+```text
+R2# configure terminal
+R2(config)# interface FastEthernet0/1
+R2(config-if)# no shutdown
+R2(config-if)# end
+```
+
+For EIGRP, the link restoration is useful because the new adjacency exchanges
+an EIGRP Update. Continue Capture/Forward until that Update appears.
 
 ## E2. OSPF packets to capture and fields to record
 
-Capture one OSPF Hello and one Link State Update if available.
+Open the OSPF file and capture:
+
+1. a stable Hello on the R2-R3 link;
+2. a Link State Update generated by shutting or restoring R2 Fa0/1.
 
 Record from the actual PDU:
 
-- outer IP source and destination;
+- outer source `10.10.9.1` or `10.10.9.2` and the displayed destination,
+  normally `224.0.0.5` for an OSPF multicast on this Ethernet link;
 - IP protocol number 89;
-- OSPF version and packet type;
+- OSPF version 2 and packet type 1 for Hello or type 4 for Link State Update;
 - packet length and checksum;
-- Router ID;
+- Router ID, expected to be `2.2.2.2` for R2 or `3.3.3.3` for R3;
 - Area ID, which must be 0;
 - authentication field/type;
 - for Hello: network mask, Hello interval, dead interval, priority, DR, BDR,
@@ -1043,38 +1349,56 @@ Screenshot checkpoints:
 
 - `screenshots/ospf/12-simulation-hello-packet.png`
 - `screenshots/ospf/13-simulation-link-state-update.png`
+- `screenshots/ospf/13a-simulation-link-restored.png`
 
 ## E3. EIGRP packets to capture and fields to record
 
-Capture one EIGRP Hello and one EIGRP Update if available.
+Open the EIGRP file and capture:
+
+1. a stable Hello on the R2-R3 link;
+2. an Update exchanged when R2 Fa0/1 is restored and the R2-R3 adjacency
+   forms again.
 
 Record:
 
-- outer IP source and destination;
-- IP protocol number 88 and multicast destination `224.0.0.10` when shown;
+- outer source `10.10.9.1` or `10.10.9.2` and destination `224.0.0.10` for a
+  normal multicast Hello; record the actual destination if an Update is
+  unicast;
+- IP protocol number 88;
 - EIGRP version;
-- opcode, such as Hello or Update;
+- opcode, normally 5 for Hello and 1 for Update;
 - checksum, flags, sequence number, and acknowledgment number;
 - autonomous-system number 100;
 - parameter/route TLV type and length;
-- K values and hold time in a Hello;
+- K values and hold time in a Hello; normally K1 and K3 are 1 while K2, K4,
+  and K5 are 0;
 - destination prefix, next hop, minimum bandwidth, cumulative delay,
   reliability, load, MTU, and hop count in an Update.
+
+Expected behavior: Hellos discover and maintain neighbors; Updates carry only
+needed route information rather than a 30-second full table. If the Event List
+shows Query or Reply during the shutdown, record it as additional convergence
+evidence, but still capture the Update after restoration for this section.
 
 Screenshot checkpoints:
 
 - `screenshots/eigrp/12-simulation-hello-packet.png`
 - `screenshots/eigrp/13-simulation-update-packet.png`
+- `screenshots/eigrp/13a-simulation-link-restored.png`
 
 ## E4. RIPv2 packets to capture and fields to record
 
-Capture one RIPv2 Response that contains route entries.
+Open the RIP file and capture one RIPv2 Response containing route entries. A
+periodic Response should appear within 30 seconds; shutting R2 Fa0/1 can also
+produce a triggered Response with a changed or poisoned metric.
 
 Record:
 
-- outer IP source and multicast destination `224.0.0.9` when shown;
+- outer source `10.10.9.1` or `10.10.9.2` and multicast destination
+  `224.0.0.9`;
+- IP protocol number 17 for UDP;
 - UDP source and destination port 520;
-- RIP command, normally Response;
+- RIP command, normally 2 for Response;
 - RIP version 2;
 - address-family identifier;
 - route tag;
@@ -1090,9 +1414,31 @@ Screenshot checkpoints:
 
 - `screenshots/rip/12-simulation-response-header.png`
 - `screenshots/rip/13-simulation-route-entries.png`
+- `screenshots/rip/13a-simulation-link-restored.png`
 
-Return to `Realtime` after each packet inspection and wait for convergence
-before continuing.
+## E5. Prove the trigger link was restored
+
+Return to Realtime after each protocol capture. Verify the R2-R3 link is
+`up/up`:
+
+```text
+R2# show ip interface brief
+R3# show ip interface brief
+```
+
+Then use the matching recovery command: `show ip ospf neighbor` in the OSPF
+file, `show ip eigrp neighbors` in the EIGRP file, or `show ip route rip` in
+the RIP file.
+
+For RIP, wait at least 35 seconds before judging recovery. Finally, from PC1:
+
+```text
+ping -n 10 10.10.16.1
+```
+
+Do not continue until the ping succeeds and R2 Fa0/1 is no longer shut down.
+Use the protocol's `13a-simulation-link-restored.png` screenshot to show the
+`up/up` interface plus recovered neighbor or route output.
 
 ---
 
@@ -1106,41 +1452,59 @@ Replace `<proto>` in screenshot names with exactly `ospf`, `eigrp`, or `rip`.
 
 ## F1. Baseline route and ping measurement
 
-1. Confirm R1 Fa1/0 and R5 Fa0/0 still show:
+1. On R1 and R5, verify the lower-path link values:
+
+   ```text
+   R1# show interfaces FastEthernet1/0
+   R5# show interfaces FastEthernet0/0
+   ```
+
+   Both outputs must show:
 
    ```text
    BW 10000 Kbit
    DLY 10000 usec
    ```
 
-2. On PC1, warm up ARP:
+   `delay 1000` is displayed by IOS as `DLY 10000 usec` because the
+   configuration unit is tens of microseconds.
 
-   ```text
-   ping -n 5 10.10.16.1
-   ```
-
-3. Run and record the actual minimum, maximum, average, and packet-loss values:
-
-   ```text
-   ping -n 50 -l 1000 10.10.16.1
-   ```
-
-4. If Packet Tracer rejects `-l`, use `ping -n 50 10.10.16.1` and record that
-   the installed PC command omitted the size option.
-5. On PC1 run:
-
-   ```text
-   tracert 10.10.16.1
-   ```
-
-6. On R1 run:
+2. On R1, record the baseline route:
 
    ```text
    show ip route 10.10.16.0
    ```
 
-With equal link settings, all three protocols are expected to prefer the
-two-hop lower path R1-R5-R4. Verify rather than assume.
+   Expected route code and next hop:
+
+   | File | Route code | Baseline next hop |
+   |---|---|---|
+   | OSPF | `O` | R5, `10.10.11.2` |
+   | EIGRP | `D` | R5, `10.10.11.2` |
+   | RIP | `R` | R5, `10.10.11.2` |
+
+3. On PC1, warm up ARP:
+
+   ```text
+   ping -n 5 10.10.16.1
+   ```
+
+4. Run and record the actual minimum, maximum, average, and packet-loss values:
+
+   ```text
+   ping -n 50 -l 1000 10.10.16.1
+   ```
+
+5. If Packet Tracer rejects `-l`, use `ping -n 50 10.10.16.1` and record that
+   the installed PC command omitted the size option.
+6. On PC1 run:
+
+   ```text
+   tracert 10.10.16.1
+   ```
+
+The trace should show the lower R1-R5-R4 path. Record the actual hop addresses
+and measured ping values; do not replace `<1 ms` with an invented delay.
 
 Screenshot checkpoints:
 
@@ -1155,29 +1519,38 @@ Apply the same severe values at both ends of only the R1-R5 link.
 On R1:
 
 ```text
-enable
-configure terminal
-interface FastEthernet1/0
- bandwidth 64
- delay 20000
-end
+R1> enable
+R1# configure terminal
+R1(config)# interface FastEthernet1/0
+R1(config-if)# bandwidth 64
+R1(config-if)# delay 20000
+R1(config-if)# end
 ```
 
 On R5:
 
 ```text
-enable
-configure terminal
-interface FastEthernet0/0
- bandwidth 64
- delay 20000
-end
+R5> enable
+R5# configure terminal
+R5(config)# interface FastEthernet0/0
+R5(config-if)# bandwidth 64
+R5(config-if)# delay 20000
+R5(config-if)# end
 ```
 
-This advertises 64 kbit/s and 200 ms to protocols. Wait 45 seconds so even the
-RIP project has time to send an update.
+This advertises 64 kbit/s and 200 ms to routing protocols. Wait until OSPF or
+EIGRP recalculates; in the RIP file wait at least 35 seconds even though RIP
+will ignore these metric inputs.
 
-Verify both ends with `show interfaces`.
+Verify both ends:
+
+```text
+R1# show interfaces FastEthernet1/0
+R5# show interfaces FastEthernet0/0
+```
+
+Both must show `BW 64 Kbit` and `DLY 200000 usec`. If only one end changed,
+correct it before comparing protocols.
 
 Screenshot checkpoint:
 
@@ -1185,11 +1558,13 @@ Screenshot checkpoint:
 
 ## F3. Prove the protocol reaction
 
-Repeat on R1 and PC1:
+On R1:
 
 ```text
 show ip route 10.10.16.0
 ```
+
+Then on PC1:
 
 ```text
 tracert 10.10.16.1
@@ -1200,9 +1575,9 @@ Expected result to verify:
 
 | Protocol | Expected next hop from R1 after degradation | Reason |
 |---|---|---|
-| OSPF | R2, `10.10.8.2` | the very low advertised bandwidth raises OSPF cost on the lower path |
-| EIGRP | R2, `10.10.8.2` | its composite metric uses minimum bandwidth and cumulative delay by default |
-| RIPv2 | R5, `10.10.11.2` | lower path is still two hops; RIP ignores bandwidth and delay |
+| OSPF | `O` through R2, `10.10.8.2` | the very low advertised bandwidth raises OSPF cost on the lower path |
+| EIGRP | `D` through R2, `10.10.8.2` | its composite metric uses minimum bandwidth and cumulative delay by default |
+| RIPv2 | `R` through R5, `10.10.11.2` | the lower path is still two hops; RIP ignores bandwidth and delay |
 
 Screenshot checkpoints:
 
@@ -1218,61 +1593,93 @@ Screenshot checkpoint:
 
 - `screenshots/<proto>/21-degraded-icmp-path-in-simulation.png`
 
-If OSPF or EIGRP still uses R5, first confirm both degraded interface values,
-then confirm no old static route exists. Do not compensate with an unrelated
-static route.
+If OSPF still uses R5, run `show ip ospf interface FastEthernet1/0` on R1 and
+confirm the cost increased. If EIGRP still uses R5, run
+`show ip eigrp topology 10.10.16.0 255.255.255.0` and confirm the R5 metric is
+worse. In either file, also confirm both degraded interface values and remove
+any old static route. Do not compensate with an unrelated static route.
 
 ## F4. Generate simultaneous congestion traffic
 
 Keep the R1-R5 link degraded for this step.
 
 1. Return to Realtime mode.
-2. Open PC1 and PC3 `Desktop` -> `Command Prompt` windows side by side.
-3. On PC1 start:
+2. Before generating traffic, record interface counters with `show interfaces`
+   on the expected path:
+
+   - OSPF/EIGRP upper path: R1 Fa0/1 and R2 Fa0/0; R2 Fa0/1 and R3 Fa0/0;
+     R3 Fa0/1 and R4 Fa0/1;
+   - RIP lower path: R1 Fa1/0 and R5 Fa0/0; R5 Fa0/1 and R4 Fa1/0.
+
+3. Open PC1 and PC3 `Desktop` -> `Command Prompt` windows side by side.
+4. On PC1 start:
 
    ```text
    ping -n 1000 -l 1400 10.10.16.1
    ```
 
-4. Immediately start this on PC3:
+5. Immediately start this on PC3:
 
    ```text
    ping -n 1000 -l 1400 10.10.6.1
    ```
 
-5. If `-l` is unsupported, remove only `-l 1400`; keep `-n 1000`.
-6. Let both commands finish. Record sent, received, lost, loss percentage,
+6. If `-l` is unsupported, remove only `-l 1400`; keep `-n 1000`.
+7. Let both commands finish. Record sent, received, lost, loss percentage,
    minimum, maximum, and average for each direction.
-7. During the run, switch briefly to Simulation, filter only ICMP, and observe
-   roughly 20 events. Then return to Realtime so the 1000-packet runs can
-   finish. Do not try to single-step all 2000 requests.
-8. Run `show interfaces` on the interfaces along the chosen path and record any
-   input/output queue drops shown by Packet Tracer.
+8. Run the same `show interfaces` commands used in step 2 and calculate the
+   counter changes. Record any input/output queue drops shown by Packet Tracer.
+9. For readable Simulation evidence, clear the Event List after the long pings
+   finish, filter only ICMP, then start `ping -n 20` from both PCs. Capture
+   roughly 20 events and stop; do not put all 2000 long-ping packets into the
+   Event List.
 
 Screenshot checkpoints:
 
 - `screenshots/<proto>/22-two-simultaneous-ping-streams.png`
+- `screenshots/<proto>/22a-interface-counters-before-congestion.png`
 - `screenshots/<proto>/23-pc1-1000-ping-result.png`
 - `screenshots/<proto>/24-pc3-1000-ping-result.png`
 - `screenshots/<proto>/25-congestion-simulation-events.png`
 - `screenshots/<proto>/26-congestion-interface-counters.png`
 
-Packet Tracer may show zero loss even under this synthetic test. Zero is a
-valid measured result; never invent drops. The route choice and protocol
-reaction remain independently provable with the route table, tracert, and
-Simulation path.
+The IOS `bandwidth` value primarily supplies a routing metric; it is not a
+physical rate limiter on real hardware. Packet Tracer may therefore show zero
+loss in this synthetic test. Zero is a valid measured result; never invent
+drops. Route choice and protocol reaction remain independently provable with
+the route table, tracert, and Simulation path.
 
 ## F5. Restore R1-R5 before Questions 7-9
 
-On R1 Fa1/0 and R5 Fa0/0 restore:
+On R1:
 
 ```text
-bandwidth 10000
-delay 1000
+R1# configure terminal
+R1(config)# interface FastEthernet1/0
+R1(config-if)# bandwidth 10000
+R1(config-if)# delay 1000
+R1(config-if)# end
 ```
 
-Wait for convergence, then confirm R1 again uses R5 for
-`10.10.16.0/24` under the normal baseline.
+On R5:
+
+```text
+R5# configure terminal
+R5(config)# interface FastEthernet0/0
+R5(config-if)# bandwidth 10000
+R5(config-if)# delay 1000
+R5(config-if)# end
+```
+
+Verify both interfaces again show `BW 10000 Kbit` and `DLY 10000 usec`. Wait
+for convergence—at least 35 seconds in RIP—then run:
+
+```text
+R1# show ip route 10.10.16.0
+```
+
+The single baseline next hop must again be R5 at `10.10.11.2`. From PC1,
+confirm `tracert 10.10.16.1` again uses R1-R5-R4.
 
 Screenshot checkpoint:
 
@@ -1297,8 +1704,8 @@ Default CEF forwarding is normally per-destination/per-flow. Therefore one
 PC1-to-PC3 flow can stay entirely on one route even when two equal routes are
 installed. An exact alternating 50/50 result for the same source/destination
 pair requires per-packet load sharing, which can reorder packets. Packet Tracer
-7.0 does not faithfully model this physical-router behavior, so do not claim
-that an animation proves exact 50/50 forwarding.
+8.2.1 does not faithfully model this physical-router behavior, as the professor
+noted, so do not claim that an animation proves exact 50/50 forwarding.
 
 OSPF and RIP install multiple paths only when their route metrics are equal.
 EIGRP can also install unequal-cost feasible paths with `variance`, but
@@ -1309,7 +1716,9 @@ per-packet forwarding method.
 ## G2. Temporary Packet Tracer route-installation demonstration
 
 Do this only as a temporary test. Take the screenshots, then undo it before
-Phase H.
+Phase H. Before changing each file, run `show ip route 10.10.16.0` on R1 and
+confirm Phase F was restored: there must be one baseline route through R5 at
+`10.10.11.2`.
 
 ### OSPF file
 
@@ -1330,7 +1739,10 @@ show ip route 10.10.16.0
 ```
 
 The target evidence is two equal OSPF next hops: `10.10.8.2` and
-`10.10.11.2`.
+`10.10.11.2`. The route output must contain two `via` lines with the same OSPF
+metric. If only R2 appears, the R1 Fa1/0 cost is too high; if only R5 appears,
+it is too low. Confirm `show ip ospf interface FastEthernet1/0` reports cost
+20 before changing any other value.
 
 Screenshot checkpoint:
 
@@ -1357,8 +1769,10 @@ show ip eigrp topology 10.10.16.0 255.255.255.0
 ```
 
 The target is two equal feasible next hops. If only one appears, keep the
-actual result and topology output; do not raise `variance` and call unequal
-sharing 50/50.
+actual result and topology output. First confirm R1 Fa1/0 shows
+`DLY 20000 usec`, wait for convergence, and check whether the topology output
+reports two successors with the same feasible distance. Do not raise
+`variance` and call unequal sharing 50/50.
 
 Screenshot checkpoints:
 
@@ -1381,7 +1795,9 @@ end
 show ip route 10.10.16.0
 ```
 
-The target is two metric-3 RIP next hops.
+After waiting at least 35 seconds, the target is two RIP next hops,
+`10.10.8.2` and `10.10.11.2`, both with hop metric 3. Confirm the route output
+contains two `via` lines with the same `[120/3]` value.
 
 Screenshot checkpoint:
 
@@ -1392,7 +1808,18 @@ If this Packet Tracer IOS rejects `offset-list`, capture the error as
 explanation below. Do not replace RIP with static routes and present that as
 RIP load balancing.
 
+For each protocol, run `ping -n 20 10.10.16.1` and several
+`tracert 10.10.16.1` commands from PC1 after the two routes are installed.
+Record what Packet Tracer actually forwards, but use the two equal `via`
+entries—not an assumed animation pattern—as proof that the routing protocol
+installed both paths. State explicitly that Packet Tracer 8.2.1 did not prove
+exact alternating 50/50 per-packet forwarding.
+
 ## G3. Real physical Cisco router method
+
+Do not enter this block as required Packet Tracer configuration. It is the
+real-IOS answer requested by the professor for the feature Packet Tracer 8.2.1
+does not model faithfully.
 
 After two equal routes are visible on R1, a physical IOS router that supports
 CEF per-packet sharing can use:
@@ -1420,12 +1847,24 @@ half for one flow but risks packet reordering, so production networks normally
 prefer per-flow/per-destination ECMP unless exact packet alternation is truly
 required.
 
+Useful verification commands on the physical R1 are:
+
+```text
+show ip route 10.10.16.0
+show ip cef 10.10.16.0
+show cef interface FastEthernet0/1
+show cef interface FastEthernet1/0
+```
+
+The route table must show both next hops, and both outgoing interfaces must
+show per-packet load sharing before claiming the requested behavior.
+
 Official sources to cite when answering the bonus:
 
 - [Cisco: CEF per-destination and per-packet load sharing](https://www.cisco.com/c/en/us/support/docs/ip/express-forwarding-cef/18285-loadbal-cef.html)
 - [Cisco: EIGRP variance and traffic-share balanced](https://www.cisco.com/c/en/us/support/docs/ip/enhanced-interior-gateway-routing-protocol-eigrp/13677-19.html)
 - [Cisco: RIP offset-list command](https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/iproute_rip/command/irr-cr-book/irr-cr-rip.html)
-- [Cisco: routing-protocol maximum paths and forwarding load balancing](https://www.cisco.com/c/en/us/support/docs/ip/border-gateway-protocol-bgp/5212-46.html)
+- [Cisco: protocol-independent `maximum-paths` command](https://www.cisco.com/c/en/us/td/docs/ios/iproute_pi/command/reference/iri_book/iri_pi1.html)
 
 ## G4. Undo the temporary Question 7 changes
 
@@ -1453,6 +1892,7 @@ exit
 router eigrp 100
  no variance
  no maximum-paths
+ no traffic-share balanced
 end
 ```
 
@@ -1469,16 +1909,25 @@ no access-list 7
 end
 ```
 
-If this IOS requires the configured value in the `no maximum-paths` command,
-use `no maximum-paths 2`. If any `ip load-sharing per-packet` command was
-accepted during a test, restore `ip load-sharing per-destination` on both R1
-outgoing interfaces.
+If any `ip load-sharing per-packet` command was accepted during a test, restore
+`ip load-sharing per-destination` on both R1 outgoing interfaces.
 
 In each file, verify that R1 has returned to one route through R5:
 
 ```text
 show ip route 10.10.16.0
 ```
+
+Also verify the protocol-specific temporary metric is gone:
+
+- OSPF: `show ip ospf interface FastEthernet1/0` returns to the calculated
+  baseline cost;
+- EIGRP: `show interfaces FastEthernet1/0` shows `DLY 10000 usec`;
+- RIP: `show running-config` contains no `offset-list 7` and no ACL 7.
+
+From PC1, run `tracert 10.10.16.1`; it must again use R1-R5-R4 before Phase H.
+Save each `.pkt` file after this verification so no temporary Question 7
+configuration survives accidentally.
 
 Screenshot checkpoints:
 
@@ -1504,7 +1953,11 @@ configure terminal
 interface FastEthernet1/0
  ip ospf cost 1000
 end
+show ip ospf interface FastEthernet1/0
 ```
+
+Confirm the output reports cost 1000. This makes the direct R4-to-R5 direction
+far more expensive than R4-R3-R2-R1-R5.
 
 ## H2. EIGRP: worsen R4's metric toward R5
 
@@ -1517,7 +1970,11 @@ interface FastEthernet1/0
  bandwidth 64
  delay 20000
 end
+show interfaces FastEthernet1/0
 ```
+
+Confirm `BW 64 Kbit` and `DLY 200000 usec`. EIGRP will advertise the resulting
+worse route metric to its neighbors.
 
 ## H3. RIP: add an inbound metric offset to every route from R5
 
@@ -1530,6 +1987,7 @@ access-list 8 permit any
 router rip
  offset-list 8 in 4 FastEthernet1/0
 end
+show running-config
 ```
 
 The offset makes R5-learned routes worse while keeping them below RIP's
@@ -1539,17 +1997,40 @@ updates, so it does not reliably enforce the desired next hop.
 
 ## H4. Verify Question 8 in each file
 
-Wait for convergence. On R4 run:
+Wait for convergence: about 15 seconds for OSPF/EIGRP and at least 35 seconds
+for RIP. On R4 run:
 
 ```text
 show ip route
 show ip route 10.10.6.0
+show ip route 10.10.11.0
 show ip route 0.0.0.0
 ```
 
-All non-connected routes for which an alternate exists should use R3 at
-`10.10.10.1`. Connected networks naturally remain connected and are not sent
-to any next-hop router.
+Expected R4 result:
+
+| File | PC1 route code | Default code | Next hop for both |
+|---|---|---|---|
+| OSPF | `O` | `O*E2` | R3, `10.10.10.1` |
+| EIGRP | `D` | `D*EX` | R3, `10.10.10.1` |
+| RIP | `R` | `R*` | R3, `10.10.10.1` |
+
+All remotely learned routes for which an alternate exists—including
+`10.10.6.0/24`, `10.10.8.0/24`, `10.10.9.0/24`, `10.10.11.0/24`, and the
+default—must use R3. R4's `10.10.10.0/24`, `10.10.12.0/24`, and
+`10.10.16.0/24` networks remain connected and cannot be sent to a next hop.
+
+Prove R3 will not send the default straight back to R4. On R3 run:
+
+```text
+show ip route 10.10.6.0
+show ip route 0.0.0.0
+```
+
+R3 should use R2 at `10.10.9.1`, not R4 at `10.10.10.2`, for the default and
+the upper path toward PC1. The worsened route R4 reports through R5 makes R2
+the better choice. Do not continue if R3 points the default back to R4; that
+would create a forwarding loop.
 
 From PC3 run:
 
@@ -1561,19 +2042,23 @@ ping -n 20 213.80.11.5
 ```
 
 The first routed hop after R4 should be R3. The Internet test should reach R5
-and Internet and receive replies through NAT.
+through the complete R4-R3-R2-R1-R5 path and receive replies through NAT.
 
 Screenshot checkpoints:
 
+- `screenshots/<proto>/30a-q8-r4-metric-configuration.png`
 - `screenshots/<proto>/31-q8-r4-all-remote-routes-via-r3.png`
+- `screenshots/<proto>/31a-q8-r3-uses-r2-not-r4.png`
 - `screenshots/<proto>/32-q8-pc3-to-pc1-via-r3.png`
 - `screenshots/<proto>/33-q8-pc3-to-internet-via-r3.png`
 
-For EIGRP, numbering follows its existing files, so use `31`, `32`, and `33`.
-For RIP and OSPF use the same numbers even if one earlier number is unused.
+Replace `<proto>` with `ospf`, `eigrp`, or `rip` in all five names.
 
 Do not remove these Question 8 settings yet; they create the active upper path
 needed for a fair R2 failure test.
+
+On R4, run `copy running-config startup-config`, then save the `.pkt` file
+before starting the failure test.
 
 ---
 
@@ -1588,10 +2073,29 @@ protocol behavior than shutting R4's directly connected R3 interface.
 For each protocol file:
 
 1. Confirm R2 is powered on and every link is green.
-2. Wait at least 60 seconds after the last configuration change.
-3. On R4, confirm `10.10.6.0/24` currently uses R3 (`10.10.10.1`).
-4. From PC3, run two successful warm-up pings to PC1.
-5. Keep a stopwatch ready. Use the same method for all protocols.
+2. On R2 and R3, run `show ip interface brief`; both ends of the R2-R3 link
+   must be `up/up`.
+3. Wait about 15 seconds for OSPF/EIGRP or at least 35 seconds for RIP after
+   the last change.
+4. On R4, run:
+
+   ```text
+   show ip route 10.10.6.0
+   show ip route 0.0.0.0
+   ```
+
+   Both routes must currently use R3 at `10.10.10.1`.
+5. On R3, run `show ip route 0.0.0.0`; it must use R2 at `10.10.9.1`, proving
+   the active path will not loop back to R4.
+6. Confirm protocol state:
+
+   - OSPF: `show ip ospf neighbor` on R3 must show R2 in `FULL` state;
+   - EIGRP: `show ip eigrp neighbors` on R3 must list R2 at `10.10.9.1`;
+   - RIP: `show ip protocols` on R3 must list R2 as a routing information
+     source.
+7. From PC3, run `ping -n 10 10.10.6.1` and
+   `tracert 10.10.6.1`. Both must succeed through R4-R3-R2-R1.
+8. Keep a stopwatch ready and use the same timing method in all three files.
 
 For EIGRP only, run this before the failure:
 
@@ -1600,7 +2104,9 @@ show ip eigrp topology 10.10.6.0 255.255.255.0
 ```
 
 Record whether the R5 route is shown as a feasible successor. This explains a
-near-immediate DUAL switchover if observed.
+near-immediate DUAL switchover if observed. Record the successor count,
+feasible distance, each next hop, and each reported distance; do not label the
+R5 path a feasible successor unless the topology output actually includes it.
 
 Screenshot checkpoints:
 
@@ -1609,19 +2115,19 @@ Screenshot checkpoints:
 
 ## I2. Measure live interruption
 
-1. On PC3 start:
+1. Keep the PC3 Command Prompt and R2 Physical windows visible at the same
+   time. On PC3 start:
 
    ```text
    ping -n 1000 -w 1000 10.10.6.1
    ```
 
-2. After at least five successful replies, open R2.
-3. Click R2's `Physical` tab.
-4. Start the stopwatch and turn R2's power switch off.
-5. Watch the PC3 command output. Count consecutive timeouts.
-6. Stop the timer when the first stable reply returns through the backup path.
-7. Press `Ctrl+C` after at least ten recovered replies.
-8. Record:
+2. After at least five successful replies, start the stopwatch and turn off
+   R2 from its `Physical` tab.
+3. Watch the PC3 command output. Count consecutive timeouts.
+4. Stop the timer when the first stable reply returns through the backup path.
+5. Press `Ctrl+C` after at least ten recovered replies.
+6. Record:
 
    - protocol;
    - failure time;
@@ -1634,6 +2140,10 @@ Screenshot checkpoints:
 If `-w` is unsupported, omit it and use only the stopwatch. Do not convert the
 number of timeouts into seconds unless the displayed/used timeout was one
 second.
+
+Do not use different failure methods between files. Power off the complete R2
+device in OSPF, EIGRP, and RIP; do not shut an interface in one file and power
+off the router in another.
 
 Screenshot checkpoints:
 
@@ -1653,14 +2163,31 @@ From PC3 run:
 
 ```text
 tracert 10.10.6.1
+ping -n 20 10.10.6.1
+tracert 213.80.11.5
+ping -n 20 213.80.11.5
 ```
 
-The recovered route should now use R5 at `10.10.12.2`.
+The recovered PC1 route and default route must now use R5 at `10.10.12.2`.
+The route codes remain protocol-specific: `O`/`O*E2`, `D`/`D*EX`, or
+`R`/`R*`. PC3-to-PC1 should follow R4-R5-R1, while PC3-to-Internet should
+follow R4-R5-Internet and receive replies through NAT.
+
+If recovery does not occur:
+
+- OSPF: check `show ip ospf neighbor` and `show ip ospf database` on R3/R4;
+- EIGRP: check `show ip eigrp topology active` and
+  `show ip eigrp topology 10.10.6.0 255.255.255.0` on R4;
+- RIP: wait at least 35 seconds, then check `show ip protocols` and
+  `show ip route rip` on R4.
+
+Do not restore R2 until the backup route and both traces are captured.
 
 Screenshot checkpoints:
 
 - `screenshots/<proto>/37-q9-r4-backup-route-via-r5.png`
 - `screenshots/<proto>/38-q9-tracert-via-r5.png`
+- `screenshots/<proto>/38a-q9-internet-through-r5.png`
 
 ## I4. Capture the protocol's failure reaction
 
@@ -1685,15 +2212,41 @@ look for Update/Query/Reply behavior and DUAL successor selection. For RIP,
 look for a triggered Response with a changed metric; if none appears
 immediately, wait for the periodic update and record the wait.
 
+Record the actual source, destination, packet type, changed prefix/metric, and
+event time. A Hello packet alone is not proof of the failure reaction.
+
 ## I5. Restore the final submitted state
 
 1. Return to Realtime.
 2. Turn R2 back on.
-3. Wait until every link is green and all adjacencies/routes have converged.
-4. Confirm R4 again uses R3 for `10.10.6.0/24`.
-5. Confirm PC1-PC3 and PC3-Internet pings succeed.
-6. Confirm Internet still has no internal route and no dynamic protocol.
-7. Save the `.pkt` file.
+3. On R2 and R3, run `show ip interface brief` and wait until the R2-R3 link is
+   `up/up`.
+4. Wait about 15 seconds for OSPF/EIGRP or at least 35 seconds for RIP.
+5. Verify recovery with the matching command:
+
+   - OSPF: `show ip ospf neighbor` on R2 must show R1 and R3 in `FULL` state;
+   - EIGRP: `show ip eigrp neighbors` on R2 must list R1 and R3;
+   - RIP: `show ip route rip` on R2 must again contain routes through both
+     sides after a periodic update.
+6. On R4, run `show ip route 10.10.6.0` and `show ip route 0.0.0.0`; both must
+   again use R3 at `10.10.10.1`.
+7. On R3, run `show ip route 0.0.0.0`; it must again use R2 at
+   `10.10.9.1`.
+8. Run these final data-plane tests:
+
+   ```text
+   PC1> ping -n 20 10.10.16.1
+   PC3> ping -n 20 10.10.6.1
+   PC3> ping -n 20 213.80.11.5
+   ```
+
+9. On Internet, run `show ip protocols` and `show ip route`; require no
+   dynamic protocol and no `10.10.*` route.
+10. On R5, run `show ip nat translations` after the Internet ping and retain
+    the translation proof.
+11. On R4, run `copy running-config startup-config` so the Question 8 setting
+    remains in the submitted file.
+12. Save the `.pkt` file.
 
 Screenshot checkpoints:
 
@@ -1715,6 +2268,11 @@ Use actual observations. The expected theoretical tendency is:
   although triggered updates may make this small Packet Tracer topology react
   faster than a full 30-second interval.
 
+For EIGRP, connect the explanation to the captured topology state: if R5 was a
+feasible successor, DUAL can promote it without a network-wide recomputation;
+if the route became Active, describe the Query/Reply exchange that completed
+the new calculation.
+
 Do not write “EIGRP was fastest” unless your measured results show that. If two
 protocols tie at Packet Tracer's timing resolution, report the tie and explain
 the theoretical mechanisms separately.
@@ -1725,6 +2283,20 @@ the theoretical mechanisms separately.
 
 Fill this while running the lab. These cells are deliberately blank; measured
 values must come from your own files.
+
+## Protocol readiness results
+
+| Verification | OSPF | EIGRP | RIPv2 |
+|---|---|---|---|
+| R1 internal neighbors or RIP sources |  |  |  |
+| R4 internal neighbors or RIP sources |  |  |  |
+| R1 route code/next hop to `10.10.16.0/24` |  |  |  |
+| R4 route code/next hop to `10.10.6.0/24` |  |  |  |
+| Learned default code and next hop |  |  |  |
+| PC1-to-PC3 result |  |  |  |
+| PC1-to-Internet result |  |  |  |
+| NAT translation and ACL match proof |  |  |  |
+| Internet has no protocol/internal route |  |  |  |
 
 ## Delay and route-change results
 
@@ -1746,16 +2318,35 @@ values must come from your own files.
 | PC3 1000-ping loss |  |  |  |
 | Interface drops/counter change |  |  |  |
 
+## Question 7 and Question 8 results
+
+| Verification | OSPF | EIGRP | RIPv2 |
+|---|---|---|---|
+| Q7 R1 next hop through R2 |  |  |  |
+| Q7 R1 next hop through R5 |  |  |  |
+| Q7 equal metric shown |  |  |  |
+| Q7 Packet Tracer forwarding actually observed |  |  |  |
+| Q7 temporary configuration removed |  |  |  |
+| Q8 R4 PC1 route code/next hop |  |  |  |
+| Q8 R4 default code/next hop |  |  |  |
+| Q8 R3 default next hop, proving no loop |  |  |  |
+| Q8 PC3-to-PC1 trace |  |  |  |
+| Q8 PC3-to-Internet trace |  |  |  |
+
 ## Failure/convergence results
 
 | Measurement | OSPF | EIGRP | RIPv2 |
 |---|---:|---:|---:|
 | R4 next hop before R2 failure |  |  |  |
+| R3 default next hop before R2 failure |  |  |  |
+| EIGRP feasible successor present | N/A |  | N/A |
 | R4 next hop after R2 failure |  |  |  |
 | Consecutive ping timeouts |  |  |  |
 | Measured recovery time |  |  |  |
-| Control packet observed |  |  |  |
+| Control packet type observed |  |  |  |
+| Changed prefix/metric in control packet |  |  |  |
 | R4 next hop after R2 restoration |  |  |  |
+| R3 default next hop after restoration |  |  |  |
 
 ## Routing-packet fields
 
@@ -1779,6 +2370,8 @@ Before considering Experiment 1 complete, verify every item:
 - [ ] No static internal routes remain from CNL4.
 - [ ] R5 has the only static default route, toward `213.80.11.5`.
 - [ ] R5 originates/redistributes that default inside each protocol file.
+- [ ] EIGRP shows the expected two-neighbor set on every internal router.
+- [ ] R1/R4 learn EIGRP `D*EX` defaults and RIP `R*` defaults through R5.
 - [ ] The external R5 Fa1/0 link runs no OSPF, EIGRP, or RIP.
 - [ ] Internet runs no dynamic protocol and has no `10.10.*` route.
 - [ ] NAT running-config plus a translated packet proves reply traffic without
@@ -1786,6 +2379,7 @@ Before considering Experiment 1 complete, verify every item:
 - [ ] OSPF Hello and Link State Update fields were captured.
 - [ ] EIGRP Hello and Update fields were captured.
 - [ ] RIPv2 Response and route-entry fields were captured.
+- [ ] R2 Fa0/1 was restored after every Simulation packet-capture trigger.
 - [ ] Baseline pings used identical settings in all files.
 - [ ] R1-R5 was degraded identically in all files.
 - [ ] OSPF and EIGRP rerouting, and RIP's hop-count behavior, were proven with
@@ -1793,10 +2387,16 @@ Before considering Experiment 1 complete, verify every item:
 - [ ] Two simultaneous 1000-packet streams were completed in every file.
 - [ ] Question 7 includes the Packet Tracer limitation, equal-route
       requirements, CEF per-packet theory, real IOS commands, and sources.
-- [ ] R4 was proven to prefer R3 in all three files.
+- [ ] Question 7's temporary costs, delays, offset lists, and maximum-paths
+      settings were removed before Question 8.
+- [ ] R4 was proven to prefer R3 in all three files, and R3 was proven to use
+      R2 rather than return the default to R4.
 - [ ] R2 was powered off in all three files and actual recovery was measured.
-- [ ] R2 was restored before saving.
+- [ ] The post-failure R4 route and traceroute both prove backup through R5.
+- [ ] R2 was restored before saving, and its adjacencies/routes recovered.
 - [ ] All final links are green and end-to-end tests pass.
+- [ ] Every worksheet cell is filled from actual Packet Tracer output; no
+      theoretical expectation is reported as a measurement.
 - [ ] All named screenshots exist and are readable.
 - [ ] No `report.txt`, `report.tex`, Experiment 2 file, or final ZIP was created
       during this walkthrough stage.
