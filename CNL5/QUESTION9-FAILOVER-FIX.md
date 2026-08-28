@@ -30,61 +30,61 @@ R2 must initially be powered on. All router-to-router links must be green.
 On R4, verify the direct R5 link:
 
 ```text
-R4> enable
-R4# ping 10.10.12.2
+enable
+ping 10.10.12.2
 ```
 
 On R5, verify the direct R1 link:
 
 ```text
-R5> enable
-R5# ping 10.10.11.1
+enable
+ping 10.10.11.1
 ```
 
 Both pings must succeed. If the first fails, enable both ends of R4-R5:
 
 ```text
-R4# configure terminal
-R4(config)# interface FastEthernet1/0
-R4(config-if)# no shutdown
-R4(config-if)# end
+configure terminal
+interface FastEthernet1/0
+no shutdown
+end
 ```
 
 ```text
-R5# configure terminal
-R5(config)# interface FastEthernet0/1
-R5(config-if)# no shutdown
-R5(config-if)# end
+configure terminal
+interface FastEthernet0/1
+no shutdown
+end
 ```
 
 If the second fails, enable both ends of R5-R1:
 
 ```text
-R5# configure terminal
-R5(config)# interface FastEthernet0/0
-R5(config-if)# no shutdown
-R5(config-if)# end
+configure terminal
+interface FastEthernet0/0
+no shutdown
+end
 ```
 
 ```text
-R1# configure terminal
-R1(config)# interface FastEthernet1/0
-R1(config-if)# no shutdown
-R1(config-if)# end
+configure terminal
+interface FastEthernet1/0
+no shutdown
+end
 ```
 
 R5 must also retain the external static default used by all three protocols:
 
 ```text
-R5# show ip route 0.0.0.0
+show ip route 0.0.0.0
 ```
 
 If it is absent, restore it:
 
 ```text
-R5# configure terminal
-R5(config)# ip route 0.0.0.0 0.0.0.0 213.80.11.5
-R5(config)# end
+configure terminal
+ip route 0.0.0.0 0.0.0.0 213.80.11.5
+end
 ```
 
 Do not run OSPF, EIGRP, or RIP on the `213.80.11.0/24` Internet link.
@@ -129,38 +129,38 @@ Screenshots:
 Question 8 should make R5 expensive, not unavailable. Keep this on R4:
 
 ```text
-R4# configure terminal
-R4(config)# interface FastEthernet1/0
-R4(config-if)# ip ospf cost 1000
-R4(config-if)# no shutdown
-R4(config-if)# exit
-R4(config)# router ospf 1
-R4(config-router)# network 10.10.0.0 0.0.255.255 area 0
-R4(config-router)# no passive-interface FastEthernet0/1
-R4(config-router)# no passive-interface FastEthernet1/0
-R4(config-router)# end
+configure terminal
+interface FastEthernet1/0
+ip ospf cost 1000
+no shutdown
+exit
+router ospf 1
+network 10.10.0.0 0.0.255.255 area 0
+no passive-interface FastEthernet0/1
+no passive-interface FastEthernet1/0
+end
 ```
 
 Repair the corresponding R5 interfaces if necessary:
 
 ```text
-R5# configure terminal
-R5(config)# router ospf 1
-R5(config-router)# network 10.10.0.0 0.0.255.255 area 0
-R5(config-router)# no passive-interface FastEthernet0/0
-R5(config-router)# no passive-interface FastEthernet0/1
-R5(config-router)# default-information originate
-R5(config-router)# end
+configure terminal
+router ospf 1
+network 10.10.0.0 0.0.255.255 area 0
+no passive-interface FastEthernet0/0
+no passive-interface FastEthernet0/1
+default-information originate
+end
 ```
 
 Ensure R1 also exchanges OSPF with R5:
 
 ```text
-R1# configure terminal
-R1(config)# router ospf 1
-R1(config-router)# network 10.10.0.0 0.0.255.255 area 0
-R1(config-router)# no passive-interface FastEthernet1/0
-R1(config-router)# end
+configure terminal
+router ospf 1
+network 10.10.0.0 0.0.255.255 area 0
+no passive-interface FastEthernet1/0
+end
 ```
 
 These `network` statements match only `10.10.*` interfaces, so OSPF remains
@@ -171,10 +171,10 @@ disabled on R5's external `213.80.11.4/24` interface.
 With R2 powered on, run:
 
 ```text
-R4# show ip ospf neighbor
-R4# show ip route 10.10.6.0
-R5# show ip ospf neighbor
-R5# show ip route 10.10.6.0
+show ip ospf neighbor
+show ip route 10.10.6.0
+show ip ospf neighbor
+show ip route 10.10.6.0
 ```
 
 Required state:
@@ -196,9 +196,9 @@ OSPF should react within seconds after Packet Tracer marks the R2 links down.
 On R4, run:
 
 ```text
-R4# show ip ospf neighbor
-R4# show ip route 10.10.6.0
-R4# show ip route 0.0.0.0
+show ip ospf neighbor
+show ip route 10.10.6.0
+show ip route 0.0.0.0
 ```
 
 The R5 adjacency must remain `FULL`, and both remote routes must use
@@ -234,40 +234,40 @@ Question 8 may worsen the metric on R4 Fa1/0, but that interface must remain in
 EIGRP:
 
 ```text
-R4# configure terminal
-R4(config)# interface FastEthernet1/0
-R4(config-if)# bandwidth 64
-R4(config-if)# delay 20000
-R4(config-if)# no shutdown
-R4(config-if)# exit
-R4(config)# router eigrp 100
-R4(config-router)# no auto-summary
-R4(config-router)# network 10.10.0.0 0.0.255.255
-R4(config-router)# no passive-interface FastEthernet0/1
-R4(config-router)# no passive-interface FastEthernet1/0
-R4(config-router)# end
+configure terminal
+interface FastEthernet1/0
+bandwidth 64
+delay 20000
+no shutdown
+exit
+router eigrp 100
+no auto-summary
+network 10.10.0.0 0.0.255.255
+no passive-interface FastEthernet0/1
+no passive-interface FastEthernet1/0
+end
 ```
 
 Repair R5 and R1 if necessary:
 
 ```text
-R5# configure terminal
-R5(config)# router eigrp 100
-R5(config-router)# no auto-summary
-R5(config-router)# network 10.10.0.0 0.0.255.255
-R5(config-router)# no passive-interface FastEthernet0/0
-R5(config-router)# no passive-interface FastEthernet0/1
-R5(config-router)# redistribute static metric 100000 1000 255 1 1500
-R5(config-router)# end
+configure terminal
+router eigrp 100
+no auto-summary
+network 10.10.0.0 0.0.255.255
+no passive-interface FastEthernet0/0
+no passive-interface FastEthernet0/1
+redistribute static metric 100000 1000 255 1 1500
+end
 ```
 
 ```text
-R1# configure terminal
-R1(config)# router eigrp 100
-R1(config-router)# no auto-summary
-R1(config-router)# network 10.10.0.0 0.0.255.255
-R1(config-router)# no passive-interface FastEthernet1/0
-R1(config-router)# end
+configure terminal
+router eigrp 100
+no auto-summary
+network 10.10.0.0 0.0.255.255
+no passive-interface FastEthernet1/0
+end
 ```
 
 ## EIGRP 2. Pre-failure proof
@@ -275,11 +275,11 @@ R1(config-router)# end
 With R2 powered on, run:
 
 ```text
-R4# show ip eigrp neighbors
-R4# show ip route 10.10.6.0
-R4# show ip eigrp topology 10.10.6.0 255.255.255.0
-R5# show ip eigrp neighbors
-R5# show ip route 10.10.6.0
+show ip eigrp neighbors
+show ip route 10.10.6.0
+show ip eigrp topology 10.10.6.0 255.255.255.0
+show ip eigrp neighbors
+show ip route 10.10.6.0
 ```
 
 Required state:
@@ -302,10 +302,10 @@ Screenshot:
 Wait several seconds, then run on R4:
 
 ```text
-R4# show ip eigrp neighbors
-R4# show ip eigrp topology active
-R4# show ip route 10.10.6.0
-R4# show ip route 0.0.0.0
+show ip eigrp neighbors
+show ip eigrp topology active
+show ip route 10.10.6.0
+show ip route 0.0.0.0
 ```
 
 R5 must remain an EIGRP neighbor. After DUAL finishes, the PC1 route must be
@@ -344,40 +344,40 @@ of 16.
 On R4:
 
 ```text
-R4# configure terminal
-R4(config)# access-list 8 permit any
-R4(config)# router rip
-R4(config-router)# version 2
-R4(config-router)# no auto-summary
-R4(config-router)# network 10.0.0.0
-R4(config-router)# no passive-interface FastEthernet0/1
-R4(config-router)# no passive-interface FastEthernet1/0
-R4(config-router)# offset-list 8 in 4 FastEthernet1/0
-R4(config-router)# end
+configure terminal
+access-list 8 permit any
+router rip
+version 2
+no auto-summary
+network 10.0.0.0
+no passive-interface FastEthernet0/1
+no passive-interface FastEthernet1/0
+offset-list 8 in 4 FastEthernet1/0
+end
 ```
 
 On R5 and R1:
 
 ```text
-R5# configure terminal
-R5(config)# router rip
-R5(config-router)# version 2
-R5(config-router)# no auto-summary
-R5(config-router)# network 10.0.0.0
-R5(config-router)# no passive-interface FastEthernet0/0
-R5(config-router)# no passive-interface FastEthernet0/1
-R5(config-router)# default-information originate
-R5(config-router)# end
+configure terminal
+router rip
+version 2
+no auto-summary
+network 10.0.0.0
+no passive-interface FastEthernet0/0
+no passive-interface FastEthernet0/1
+default-information originate
+end
 ```
 
 ```text
-R1# configure terminal
-R1(config)# router rip
-R1(config-router)# version 2
-R1(config-router)# no auto-summary
-R1(config-router)# network 10.0.0.0
-R1(config-router)# no passive-interface FastEthernet1/0
-R1(config-router)# end
+configure terminal
+router rip
+version 2
+no auto-summary
+network 10.0.0.0
+no passive-interface FastEthernet1/0
+end
 ```
 
 ## RIP 2. Pre-failure proof
@@ -385,10 +385,10 @@ R1(config-router)# end
 RIP has no neighbor-state command. With R2 powered on, run:
 
 ```text
-R4# show ip protocols
-R4# show ip route 10.10.6.0
-R5# show ip protocols
-R5# show ip route 10.10.6.0
+show ip protocols
+show ip route 10.10.6.0
+show ip protocols
+show ip route 10.10.6.0
 ```
 
 Required state:
@@ -416,9 +416,9 @@ the routing table.
 After recovery, run:
 
 ```text
-R4# show ip protocols
-R4# show ip route 10.10.6.0
-R4# show ip route 0.0.0.0
+show ip protocols
+show ip route 10.10.6.0
+show ip route 0.0.0.0
 ```
 
 The PC1 route must be `R` through `10.10.12.2`, and the default must be `R*`
@@ -440,9 +440,9 @@ Screenshots:
 
 If no R5 route appears after the full wait:
 
-1. Confirm `R4# ping 10.10.12.2` succeeds.
-2. Confirm `R4# show ip protocols` lists `10.10.12.2` as a source.
-3. Confirm `R5# show ip route 10.10.6.0` uses `10.10.11.1`.
+1. Confirm `ping 10.10.12.2` succeeds.
+2. Confirm `show ip protocols` lists `10.10.12.2` as a source.
+3. Confirm `show ip route 10.10.6.0` uses `10.10.11.1`.
 4. Recheck that R4's offset is 4 and that Fa1/0 is not passive.
 
 ---
