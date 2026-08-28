@@ -30,7 +30,7 @@ report. Do not create `report.txt` or `report.tex` yet.
 
 ## What already exists on this computer
 
-- Packet Tracer 7.0 is installed.
+- Packet Tracer 8.2.1 is installed.
 - The correct starting topology is `../CNL4/3.pkt`, not `../CNL4/1.pkt`.
 - The prior CNL4 work identifies the group number as **6**.
 - R1, R4, and R5 already have `NM-2FE2W` modules and the required third
@@ -219,8 +219,8 @@ Do this on R1, R2, R3, R4, R5, and Internet.
    show running-config | include ip route
    ```
 
-2. If Packet Tracer 7 rejects the pipe, run `show running-config` and scroll to
-   the global `ip route` lines.
+2. If the simulated IOS rejects the pipe, run `show running-config` and scroll
+   to the global `ip route` lines.
 3. For every displayed line, enter configuration mode and repeat that exact
    line with `no` in front. Example:
 
@@ -259,11 +259,12 @@ Because the Internet router is not allowed to know any `10.10.*` route, do
 the Internet router can reply to the directly connected address
 `213.80.11.4` instead.
 
-First verify the interface names on R5:
+First verify the interface names on R5. In the transcripts below, type only the
+text after each prompt; the prompt itself shows the IOS mode you must be in.
 
 ```text
-enable
-show ip interface brief
+R5> enable
+R5# show ip interface brief
 ```
 
 The expected assignments are:
@@ -275,45 +276,53 @@ The expected assignments are:
 All three must show `up/up`. If the external address is on a different
 interface, substitute that actual interface everywhere Fa1/0 appears below.
 
-Enter the following commands on R5 exactly. IOS normally prints no success
-message after a valid configuration command; the next prompt is the expected
-response.
+Enter the following commands on R5 exactly:
 
 ```text
-enable
-configure terminal
-no access-list 1
-access-list 1 permit 10.10.0.0 0.0.255.255
-interface FastEthernet0/0
- ip nat inside
-exit
-interface FastEthernet0/1
- ip nat inside
-exit
-interface FastEthernet1/0
- ip nat outside
-exit
-ip nat inside source list 1 interface FastEthernet1/0 overload
-ip route 0.0.0.0 0.0.0.0 213.80.11.5
-end
-copy running-config startup-config
+R5> enable
+R5# configure terminal
+R5(config)# no access-list 1
+R5(config)# access-list 1 permit 10.10.0.0 0.0.255.255
+R5(config)# interface FastEthernet0/0
+R5(config-if)# ip nat inside
+R5(config-if)# exit
+R5(config)# interface FastEthernet0/1
+R5(config-if)# ip nat inside
+R5(config-if)# exit
+R5(config)# interface FastEthernet1/0
+R5(config-if)# ip nat outside
+R5(config-if)# exit
+R5(config)# ip nat inside source list 1 interface FastEthernet1/0 overload
+R5(config)# ip route 0.0.0.0 0.0.0.0 213.80.11.5
+R5(config)# end
+R5# copy running-config startup-config
 ```
 
-Press Enter when IOS asks for the destination filename. If `no access-list 1`
-reports that ACL 1 does not exist, continue; its purpose is only to remove an
-old or incorrect ACL before recreating it.
+Press Enter when IOS asks for the destination filename. Packet Tracer 8.2.1
+normally prints nothing after a valid configuration command; returning to the
+next prompt with no error means the command was accepted.
 
-Now verify the saved configuration on R5. Do not use a pipe such as
-`| include`, because older Packet Tracer IOS images may not implement it:
+The prompt is essential:
+
+- `ip nat inside` and `ip nat outside` must be entered at `R5(config-if)#`.
+- Entering `ip nat inside` at `R5(config)#` produces `% Incomplete command`
+  because IOS interprets it as the beginning of the global NAT command.
+- The longer `ip nat inside source ... overload` command must be entered at
+  `R5(config)#`, after leaving interface mode with `exit`.
+
+If `no access-list 1` reports that ACL 1 does not exist, continue; its purpose
+is only to remove an old or incorrect ACL before recreating it.
+
+Now verify the saved configuration on R5:
 
 ```text
-show running-config
-show ip route 0.0.0.0
-show ip nat statistics
+R5# show running-config
+R5# show ip route 0.0.0.0
+R5# show ip nat statistics
 ```
 
-Scroll through `show running-config` and confirm all of these lines are
-present:
+Press Space at every `--More--` prompt and confirm all of these lines are
+present in `show running-config`:
 
 ```text
 access-list 1 permit 10.10.0.0 0.0.255.255
@@ -326,17 +335,13 @@ table or zero counters are normal because no internal PC has generated traffic
 through R5 yet. The NAT lines in `show running-config`, not a nonempty table,
 are the configuration proof.
 
-If those lines are absent, the NAT configuration was not stored. Return to
-`configure terminal`, repeat the NAT block one command at a time, and watch for
-the first `% Invalid input` message. Do not confuse missing running-config
-lines with an empty translation table: the former is a configuration failure;
-the latter can be normal before traffic.
-
-If any `ip nat ...` command displays `% Invalid input detected at '^' marker`,
-the selected router/IOS image does not implement that NAT command. Capture the
-rejection as `screenshots/common/15a-r5-nat-command-rejected.png`, keep R5's
-static default route, and use the fallback proof in B2. Do **not** compensate
-by adding an internal or summary route to the Internet router.
+If a NAT line is absent, repeat that interface step and check the prompt before
+entering it. An `% Incomplete command` response to `ip nat inside` means you
+are still at `R5(config)#`; first enter `interface FastEthernet0/0` or
+`interface FastEthernet0/1` and confirm the prompt changes to
+`R5(config-if)#`. Do not confuse missing running-config lines with an empty
+translation table: the former is a configuration failure; the latter is
+normal before traffic.
 
 Do not configure any default or internal static route on the Internet router.
 Verify there:
@@ -373,9 +378,7 @@ Screenshot checkpoints:
 - `screenshots/common/17-internet-has-no-routing-protocol.png`
 
 Do not proceed if Internet shows an OSPF, EIGRP, RIP, static `10.10.*`, or
-summary `10.10.0.0/16` route. If NAT is unsupported, proceeding means accepting
-that an Internet ping sourced by an internal PC may be one-way; B2 explains
-the valid isolation proof for that case.
+summary `10.10.0.0/16` route.
 
 ## A5. Apply one identical artificial metric profile
 
@@ -669,10 +672,6 @@ From PC1, warm up ARP and verify the internal destination:
 ping 10.10.16.1
 ```
 
-Then use the branch that matches the result of A4.
-
-### When R5 accepted the NAT commands
-
 From PC1 generate enough external traffic for the translation to remain easy
 to inspect:
 
@@ -700,22 +699,6 @@ If the source remains `10.10.6.1`, NAT is not operating. Recheck the three
 interface roles and the global overload line; do not claim the successful ping
 as NAT evidence.
 
-### When Packet Tracer rejected the NAT commands
-
-Do not expect a successful reply from Internet, because Internet correctly has
-no route back to `10.10.6.0/24`. Prove the permitted behavior instead:
-
-1. On R5, run `ping 213.80.11.5` to prove the external link itself works.
-2. On R1, run `show ip route 0.0.0.0` to prove the learned default points toward
-   R5.
-3. In Simulation mode, send a Simple PDU from PC1 to `213.80.11.5` and show the
-   Echo Request follows the internal default route to R5 and exits Fa1/0.
-4. On Internet, run `show ip route` and `show ip protocols` again to prove no
-   internal route or dynamic protocol was added.
-
-The missing Echo Reply in this fallback is expected and must be explained as
-the consequence of enforcing Internet isolation on an IOS image without NAT.
-
 Screenshot checkpoints:
 
 - `screenshots/ospf/06-r1-neighbors-and-routes.png`
@@ -725,14 +708,9 @@ Screenshot checkpoints:
 - `screenshots/ospf/10-pc1-internal-and-internet-ping.png`
 - `screenshots/ospf/11-r5-nat-proof.png`
 
-For the unsupported-NAT fallback, replace the last two names with:
-
-- `screenshots/ospf/10-pc1-default-path-fallback.png`
-- `screenshots/ospf/11-r5-nat-rejection-and-isolation-proof.png`
-
 Do not continue until PC1-to-PC3 works, the default route exists internally,
-and Internet remains unaware of the internal prefixes. Require a successful
-PC1-to-Internet reply only when NAT is supported and verified.
+PC1-to-Internet replies succeed through NAT, and Internet remains unaware of
+the internal prefixes.
 
 ---
 
@@ -866,10 +844,6 @@ Screenshot checkpoints:
 - `screenshots/eigrp/09-internet-still-isolated.png`
 - `screenshots/eigrp/10-pc1-internal-and-internet-ping.png`
 - `screenshots/eigrp/11-r5-nat-proof.png`
-
-If Packet Tracer rejected NAT, use the B2 fallback and name its last two
-screenshots `screenshots/eigrp/10-pc1-default-path-fallback.png` and
-`screenshots/eigrp/11-r5-nat-rejection-and-isolation-proof.png` instead.
 
 ---
 
@@ -1008,10 +982,6 @@ Screenshot checkpoints:
 - `screenshots/rip/09-internet-still-isolated.png`
 - `screenshots/rip/10-pc1-internal-and-internet-ping.png`
 - `screenshots/rip/11-r5-nat-proof.png`
-
-If Packet Tracer rejected NAT, use the B2 fallback and name its last two
-screenshots `screenshots/rip/10-pc1-default-path-fallback.png` and
-`screenshots/rip/11-r5-nat-rejection-and-isolation-proof.png` instead.
 
 ---
 
@@ -1590,10 +1560,8 @@ tracert 213.80.11.5
 ping -n 20 213.80.11.5
 ```
 
-The first routed hop after R4 should be R3. When NAT is supported, the Internet
-test should reach R5 and Internet and receive replies through NAT. With the
-unsupported-NAT fallback, use Simulation to prove that the request reaches R5
-and exits Fa1/0; a reply is not required.
+The first routed hop after R4 should be R3. The Internet test should reach R5
+and Internet and receive replies through NAT.
 
 Screenshot checkpoints:
 
@@ -1723,8 +1691,7 @@ immediately, wait for the periodic update and record the wait.
 2. Turn R2 back on.
 3. Wait until every link is green and all adjacencies/routes have converged.
 4. Confirm R4 again uses R3 for `10.10.6.0/24`.
-5. Confirm PC1-PC3 succeeds. Confirm PC3-Internet succeeds when NAT is
-   supported; otherwise repeat the one-way Simulation proof from B2.
+5. Confirm PC1-PC3 and PC3-Internet pings succeed.
 6. Confirm Internet still has no internal route and no dynamic protocol.
 7. Save the `.pkt` file.
 
@@ -1814,9 +1781,8 @@ Before considering Experiment 1 complete, verify every item:
 - [ ] R5 originates/redistributes that default inside each protocol file.
 - [ ] The external R5 Fa1/0 link runs no OSPF, EIGRP, or RIP.
 - [ ] Internet runs no dynamic protocol and has no `10.10.*` route.
-- [ ] NAT running-config plus a translated Simulation packet proves reply
-      traffic, or the Packet Tracer rejection plus one-way fallback is
-      documented; Internet learns no internal route in either case.
+- [ ] NAT running-config plus a translated packet proves reply traffic without
+      teaching Internet any internal route.
 - [ ] OSPF Hello and Link State Update fields were captured.
 - [ ] EIGRP Hello and Update fields were captured.
 - [ ] RIPv2 Response and route-entry fields were captured.
