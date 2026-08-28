@@ -1,0 +1,765 @@
+CNL2 — complete Wireshark experiment walkthrough
+================================================
+
+Target setup
+------------
+These menu names are written for the software installed on this computer:
+
+- Ubuntu/Linux
+- Wireshark 4.4.8
+- Firefox 153
+
+If you perform the lab on another operating system or a materially different
+Wireshark version, keep the filters and evidence requirements below, but expect
+small changes in button placement.
+
+Important rules before starting
+-------------------------------
+
+1. Do the captures yourself. Do not copy measured values, IP addresses, packet
+   numbers, timings, passwords, or screenshots from anybody else.
+2. The required supplied file `telnet.pcap` is currently missing from `CNL2`.
+   Request/download the exact file for Experiment 2 from the course staff or
+   course portal before doing section B2 below. The live Telehack capture is not
+   a replacement for that supplied file because questions B2.1–B2.3 explicitly
+   refer to `telnet.pcap`.
+3. Never type a real username or password into Telnet. Telehack is only used for
+   harmless public commands.
+4. Use one capture file per experiment. Save in legacy pcap format, not the
+   default pcapng format, because the grading criteria explicitly require `.pcap`.
+5. A screenshot must show enough context to prove the result: keep the packet
+   list, selected packet, relevant expanded protocol fields, and display filter
+   visible whenever possible. Do not crop away packet numbers, filters, or field
+   names.
+6. For a screenshot of the active window on Ubuntu, press `Alt+Print Screen` and
+   save it with the exact suggested filename. If your desktop opens a screenshot
+   dialog, choose `Window`, click Wireshark/Terminal, then click `Capture`.
+
+Files to produce/request
+------------------------
+
+Produce:
+
+- `http.pcap`
+- `telehack-live.pcap`
+- `dns.pcap`
+- the screenshots named in this walkthrough
+- the recovered HTTP images
+
+Request/download:
+
+- `telnet.pcap` supplied for Experiment 2
+
+Keep a small text note while working. Immediately record actual IP addresses,
+packet numbers, sequence numbers, query/response types, protocol percentages,
+byte counts, and measured times. These values will later be used in
+`answers.txt` and the Persian report; do not try to reconstruct them from memory.
+
+
+PART 0 — one-time preparation
+=============================
+
+0.1 Create the evidence folders
+-------------------------------
+
+1. Open `Files`.
+2. Browse to `/home/kshyst/Desktop/University/CNL/CNL2`.
+3. Right-click an empty area and click `New Folder`.
+4. Name it `screenshots` and press `Enter`.
+5. Create a second folder named `recovered-http`.
+
+No screenshot is needed for folder creation.
+
+0.2 Record the software and network interface
+---------------------------------------------
+
+1. Open `Terminal`.
+2. Run:
+
+       wireshark --version
+
+3. Record the first line.
+4. Run:
+
+       ip -brief address
+
+5. Find the interface that is `UP` and has the address used for Internet
+   access. On this computer it is currently `wlp0s20f3`, but verify it again at
+   experiment time instead of assuming it is unchanged.
+
+Screenshot checkpoint `screenshots/00-environment.png`:
+Capture the Terminal with the Wireshark version and `ip -brief address` output
+visible. Do not hide the active interface or its IP address.
+
+0.3 Use a clean browser session
+-------------------------------
+
+1. Open Firefox.
+2. Click the three-line menu button at the upper right.
+3. Click `New private window`.
+4. Close other tabs in that private window.
+5. Do not open the target page until the HTTP capture has started.
+
+No screenshot is needed yet.
+
+
+PART A — Experiment 1: initial HTTP analysis
+============================================
+
+A1. Capture the HTTP page load
+------------------------------
+
+A1.1 Configure the capture
+
+1. Open Wireshark.
+2. Click `Capture` in the top menu.
+3. Click `Options...`.
+4. In the `Input` tab, click once on the active Internet interface identified in
+   step 0.2. Select only that interface. Its `Traffic` sparkline should be moving.
+5. Leave the `Capture Filter` field completely empty. A capture filter such as
+   `http` would incorrectly remove the DNS and TCP packets needed by the questions.
+6. Keep `Promiscuous` enabled for the selected interface.
+7. Keep `Snaplen` at the default/unlimited value so image bodies are not cut off.
+8. Click the `Output` tab.
+9. Enable `Capture to a permanent file` if it is not already enabled.
+10. Click the browse button beside `File`, browse to the `CNL2` folder, enter
+    `http.pcap`, and click `Save` in the file chooser.
+11. In `Output format`, select the entry containing `pcap` (not `pcapng`). In
+    Wireshark this is normally displayed as `pcap` or
+    `Wireshark/tcpdump/... - pcap`.
+12. Do not enable a ring buffer or automatic creation of multiple files.
+13. Click `Start`.
+
+Screenshot checkpoint `screenshots/01-http-capture-running.png`:
+After clicking Start, capture the Wireshark window while packets are visibly
+arriving. The interface/capture status and packet list should be visible.
+
+A1.2 Generate only the intended HTTP traffic
+
+1. Switch to the private Firefox window.
+2. Click the address bar.
+3. Type this exact URL, including `http://`:
+
+       http://sina.sharif.edu/~azad/
+
+4. Press `Enter`.
+5. Wait until the page and its photographs are fully visible and the loading
+   indicator stops.
+6. Verify that the address bar still begins with `http://`. If Firefox upgrades
+   it to HTTPS, click the padlock/shield warning and choose to continue to the
+   HTTP site. If HTTPS-Only Mode prevents this, click the three-line Firefox
+   menu -> `Settings` -> `Privacy & Security` -> scroll to `HTTPS-Only Mode` ->
+   select `Don't enable HTTPS-Only Mode`, then repeat the page load. Re-enable
+   your previous HTTPS-Only setting after the capture.
+7. Press `Ctrl+Shift+R` once to force a complete reload and ensure the two page
+   images are requested during the capture.
+8. Wait for the reload to finish.
+
+Screenshot checkpoint `screenshots/02-http-page.png`:
+Capture the Firefox window with the complete page, both downloaded images, and
+the full `http://sina.sharif.edu/~azad/` address visible.
+
+A1.3 Stop and preserve the capture
+
+1. Return to Wireshark.
+2. Click `Capture` -> `Stop`, or click the red square Stop button in the toolbar.
+   `Ctrl+E` performs the same action.
+3. Click `File` -> `Save`.
+4. If a format warning appears, keep the selected pcap format and confirm.
+5. In the file manager, verify that `CNL2/http.pcap` exists and is not empty.
+
+No screenshot is needed for the Save dialog. The actual `http.pcap` is stronger
+evidence and must be submitted.
+
+A2. Confirm that the HTTP GET belongs to the requested site
+-----------------------------------------------------------
+
+1. Click the `Display filter` bar above the packet list.
+2. Enter:
+
+       http.request.method == "GET"
+
+3. Press `Enter` or click the blue arrow at the right of the filter bar.
+4. Click the first GET packet whose `Info` column refers to the page.
+5. In the middle `Packet Details` pane, click the arrow beside
+   `Hypertext Transfer Protocol` to expand it.
+6. Find `Host: sina.sharif.edu`. Also record the request URI and packet number.
+
+Screenshot checkpoint `screenshots/03-http-get-host.png`:
+Show the green display filter, selected GET row, expanded HTTP section, `Host`,
+request URI, and packet number in one screenshot.
+
+A3. Determine which protocols carry most of the traffic
+-------------------------------------------------------
+
+1. Clear the display filter by clicking the `X` at the right side of the filter
+   bar. This is essential; statistics otherwise apply only to displayed packets.
+2. Click `Statistics` -> `Protocol Hierarchy`.
+3. Expand relevant rows using the arrows beside `Internet Protocol Version 4`,
+   `Transmission Control Protocol`, and `Hypertext Transfer Protocol`.
+4. Read both `Packets`/`Percent Packets` and `Bytes`/`Percent Bytes`.
+5. Record the largest protocols separately. Because one packet contains several
+   protocol layers, percentages from different layers need not add to 100%.
+6. Click the `Copy` button and choose `as CSV` if available; paste the copied
+   values into your working notes. Do not use the copied table as a substitute
+   for the screenshot.
+
+Screenshot checkpoint `screenshots/04-http-protocol-hierarchy.png`:
+Capture the entire Protocol Hierarchy window with the expanded rows and all
+packet/byte columns visible. This is the main evidence for Question A3.
+
+A4. Measure HTTP GET to HTTP 200 OK time
+----------------------------------------
+
+1. Close the Protocol Hierarchy window.
+2. Enter this display filter:
+
+       http.request.method == "GET" || http.response.code == 200
+
+3. Select the first GET for `sina.sharif.edu`.
+4. Expand `Hypertext Transfer Protocol` in Packet Details.
+5. Find `Response in frame: N`, where `N` is a packet number.
+6. Double-click the linked frame number `N` if it is clickable. Otherwise press
+   `Ctrl+G`, enter `N`, and press `Enter`.
+7. On the selected `HTTP/1.1 200 OK` response, expand
+   `Hypertext Transfer Protocol`.
+8. Find and record all three fields:
+
+   - `Request in frame`
+   - `Response in frame`/the current response frame number
+   - `Time since request`
+
+9. The exact answer to the timing question is Wireshark's `Time since request`
+   value for that matched response. Record it with its displayed unit/precision.
+10. If the first GET did not receive a 200 response, use the first GET that has a
+    linked 200 response and state this selection honestly in the report.
+
+Screenshot checkpoint `screenshots/05-http-get-ok-time.png`:
+Show the filter, the GET and 200 OK rows, the selected response, and the expanded
+HTTP fields containing `Request in frame` and `Time since request`.
+
+A5. Find the absolute sequence number of the first TCP connection
+----------------------------------------------------------------
+
+1. Enter this display filter:
+
+       tcp.flags.syn == 1 && tcp.flags.ack == 0
+
+2. Click the first displayed SYN packet by the smallest packet number. This is
+   the first newly initiated TCP connection captured in the file.
+3. Expand `Transmission Control Protocol` in Packet Details.
+4. Record `Sequence Number (raw)`. This field is the absolute/raw sequence
+   number even while relative display is enabled.
+5. To visibly demonstrate the absolute/relative distinction, click
+   `Edit` -> `Preferences...`.
+6. Expand `Protocols`, select `TCP`, and clear the checkbox
+   `Relative sequence numbers`.
+7. Click `OK`.
+8. Re-select the same SYN packet and expand `Transmission Control Protocol`.
+9. Record the displayed `Sequence Number` and confirm it matches
+   `Sequence Number (raw)`.
+
+Screenshot checkpoint `screenshots/06-http-absolute-sequence.png`:
+Show the SYN-only filter, the first SYN packet, and the expanded TCP fields with
+the absolute/raw sequence number visible.
+
+10. Restore the normal setting: `Edit` -> `Preferences...` -> `Protocols` ->
+    `TCP` -> check `Relative sequence numbers` -> `OK`.
+
+A6. Identify DNS query and response types in the HTTP capture
+-------------------------------------------------------------
+
+1. Enter:
+
+       dns && dns.qry.name == "sina.sharif.edu"
+
+2. Select the first row whose `Info` begins with `Standard query`.
+3. Expand `Domain Name System (query)`.
+4. Expand `Queries`.
+5. Record the query `Name`, `Type`, and `Class`. Do not assume the type is A;
+   Firefox may issue A and AAAA queries.
+
+Screenshot checkpoint `screenshots/07-http-dns-query-type.png`:
+Show the DNS filter, selected query row, and expanded `Queries` fields including
+Name, Type, and Class.
+
+6. Select the matching `Standard query response`. Match it using the same
+   transaction ID and query name.
+7. Expand `Domain Name System (response)` and then `Answers`.
+8. Record every response record type actually present, such as CNAME, A, or
+   AAAA, together with the returned value and TTL. Do not call the IP address a
+   response "type"; the type is the record type shown by Wireshark.
+
+Screenshot checkpoint `screenshots/08-http-dns-response-type.png`:
+Show the matching response, transaction ID, and all expanded Answer records with
+their Type and returned values visible. Take a second screenshot with the same
+base name plus `-2` if all answers do not fit on one screen.
+
+A7. Recover downloaded images through Wireshark
+-----------------------------------------------
+
+1. Clear the display filter with the `X` button.
+2. Click `File` -> `Export Objects` -> `HTTP...`.
+3. Wait until the object list finishes populating.
+4. Click the `Content Type` column heading so image types are grouped.
+5. Find the rows whose content type begins with `image/`. For the supplied page,
+   expect the HTTP object list to include the two JPEG page images, but report
+   only what your capture actually contains.
+
+Screenshot checkpoint `screenshots/09-http-export-object-list.png`:
+Capture the Export HTTP Objects dialog with the image rows, host, content type,
+size, and filename visible.
+
+6. Click the first image row.
+7. Click `Save`.
+8. Browse to `CNL2/recovered-http`, keep a meaningful filename and correct image
+   extension, then click `Save`.
+9. Repeat steps 6–8 for every image object. Do not click `Save All` unless you
+   intentionally want HTML and other non-image objects too; Wireshark's Save All
+   exports all objects, including objects hidden by the text filter.
+10. Open `Files` -> `CNL2/recovered-http`.
+11. Switch to thumbnail/icon view and open each image once to verify it is valid.
+
+Screenshot checkpoint `screenshots/10-http-recovered-images.png`:
+Show the `recovered-http` folder in thumbnail view with every recovered image and
+its filename visible.
+
+Record for the report after Part A
+----------------------------------
+
+- HTTP capture filename and capture date/time: __________
+- Active interface and local IP: __________
+- First relevant GET frame and Host: __________
+- Largest protocols by Packets and Percent Packets: __________
+- Largest protocols by Bytes and Percent Bytes: __________
+- GET frame -> 200 OK frame: __________ -> __________
+- `Time since request`: __________
+- First TCP SYN frame: __________
+- Absolute/raw sequence number: __________
+- DNS query type(s): __________
+- DNS response record type(s) and values: __________
+- Recovered image filenames: __________
+
+
+PART B — Experiment 2: Telnet
+=============================
+
+B1. Produce and analyze your own Telehack capture
+------------------------------------------------
+
+B1.1 Start a fresh capture
+
+1. In Wireshark click `File` -> `Close`. Save `http.pcap` if prompted.
+2. Click `Capture` -> `Options...`.
+3. Select only the active Internet interface.
+4. Leave `Capture Filter` empty.
+5. Click `Output`.
+6. Set the file to `CNL2/telehack-live.pcap`.
+7. Set `Output format` to pcap, not pcapng.
+8. Click `Start`.
+
+No screenshot is needed until traffic is generated.
+
+B1.2 Connect and run harmless commands
+
+1. Open Terminal.
+2. Run:
+
+       telnet telehack.com 23
+
+3. Wait for the Telehack prompt/banner.
+4. Type each of these harmless public commands separately and press `Enter`
+   after each one:
+
+       help
+       date
+       cal
+
+5. Do not enter any private username or password.
+
+Screenshot checkpoint `screenshots/11-telehack-terminal.png`:
+Capture the Terminal with `telehack.com`, the commands, and representative
+server output visible. If it does not all fit, capture the connection banner and
+commands as two screenshots named `11-telehack-terminal-1.png` and `-2.png`.
+
+6. To disconnect reliably, press `Ctrl+]` (Control and right bracket together).
+7. At the local `telnet>` prompt, type `quit` and press `Enter`.
+8. Return to Wireshark and click `Capture` -> `Stop`.
+9. Click `File` -> `Save` and verify `telehack-live.pcap` exists.
+
+B1.3 Inspect negotiation and plaintext
+
+1. Enter this display filter:
+
+       telnet || tcp.port == 23
+
+2. Select an early packet labeled `TELNET`.
+3. Expand `Telnet` in Packet Details. Inspect option-negotiation commands such
+   as WILL, WONT, DO, DONT, and suboptions if they occur in your capture.
+
+Screenshot checkpoint `screenshots/12-telehack-negotiation.png`:
+Show the filter, several Telnet rows, and one expanded Telnet negotiation packet.
+
+4. Right-click a Telnet/TCP port 23 packet in the packet list.
+5. Click `Follow` -> `TCP Stream`.
+6. In the Follow TCP Stream window, set `Show data as` to `ASCII`.
+7. Set the direction selector to `Entire conversation`.
+8. Observe that client-to-server data and server-to-client data use different
+   colors and that the commands are readable.
+
+Screenshot checkpoint `screenshots/13-telehack-follow-stream.png`:
+Show the whole Follow TCP Stream dialog, both directions, the readable commands,
+the Stream number, `Entire conversation`, and `ASCII`. This is the strongest
+evidence for the required observations.
+
+9. Click `Close` to keep the stream filter, or `Back` to restore the previous
+   display filter.
+
+Write these observations in your notes, using only what you saw:
+
+- TCP connection uses server port 23.
+- Which Telnet options were negotiated: __________
+- Which commands were visible as plaintext: __________
+- Whether server responses were also readable: __________
+- Client IP and server IP in your live capture: __________
+
+B2. Analyze the course-supplied `telnet.pcap`
+------------------------------------------------
+
+Do not start this section until the exact course file has been placed at
+`CNL2/telnet.pcap`. Do not fabricate answers if it remains unavailable.
+
+B2.1 Open and isolate the Telnet connection
+
+1. Click `File` -> `Open...`.
+2. Select `CNL2/telnet.pcap` and click `Open`.
+3. Enter:
+
+       tcp.flags.syn == 1 && tcp.flags.ack == 0 && tcp.dstport == 23
+
+4. Select the first matching SYN packet.
+5. Expand `Internet Protocol Version 4` and `Transmission Control Protocol`.
+6. The source IP is the client and the destination IP is the Telnet server for
+   this initial connection request. Confirm the destination port is 23.
+
+If the capture begins after the handshake and this filter returns no rows:
+
+1. Clear the filter.
+2. Click `Statistics` -> `Conversations`.
+3. Click the `TCP` tab.
+4. Find the conversation where one endpoint port is 23.
+5. The endpoint using port 23 is the server; the other endpoint using a high,
+   temporary port is the client.
+
+Screenshot checkpoint `screenshots/14-telnet-pcap-client-server.png`:
+Prefer the selected SYN with expanded IPv4/TCP fields. If no SYN exists, capture
+the TCP Conversations tab with both IP addresses, both ports, packet count, and
+byte count visible.
+
+B2.2 Recover the login password
+
+1. Clear the display filter.
+2. Enter:
+
+       telnet || tcp.port == 23
+
+3. Select any packet from the relevant Telnet connection.
+4. Right-click it -> `Follow` -> `TCP Stream`.
+5. Set `Show data as` to `ASCII`.
+6. Set the direction selector first to `Entire conversation`.
+7. Find the server's login/password prompts and the client bytes sent after each
+   prompt. Client-to-server text is red in the default theme and server-to-client
+   text is blue; rely on direction/endpoint labels if your theme uses other colors.
+8. If server text makes the password hard to read, change the direction selector
+   from `Entire conversation` to the `client_IP:client_port -> server_IP:23`
+   direction.
+9. Record the exact password shown by the client bytes. A password may not be
+   echoed by the server, but Telnet still transmits the client's characters in
+   the unencrypted TCP stream.
+
+Screenshot checkpoint `screenshots/15-telnet-pcap-password.png`:
+Show the login/password prompt context and client-to-server characters in the
+Follow TCP Stream dialog, together with direction and ASCII controls. This file
+contains lab credentials from the supplied trace; do not publish it outside the
+course submission.
+
+B2.3 Recover commands executed by the client
+
+1. Keep the same Follow TCP Stream window open.
+2. Select `Entire conversation` again so prompts and responses give context.
+3. Starting after successful login, list each client command in order.
+4. Distinguish commands from server output using the direction colors/labels.
+5. Record the exact spelling and order of all commands.
+
+Screenshot checkpoint `screenshots/16-telnet-pcap-commands.png`:
+Show the portion of the stream containing all client commands and enough server
+responses to prove their boundaries. Use numbered `-1`, `-2`, ... screenshots if
+the stream is longer than one screen.
+
+Record for the report after Part B
+----------------------------------
+
+- Live Telehack client IP and server IP: __________
+- Live commands and observed readable data: __________
+- Supplied pcap client IP: __________
+- Supplied pcap server IP: __________
+- Supplied pcap login/password: __________
+- Supplied pcap client commands in order: __________
+
+
+PART C — Experiment 3: DNS request/response analysis
+====================================================
+
+C1. Clear the local DNS cache and record resolver settings
+---------------------------------------------------------
+
+The assignment's old Linux command restarts the networking service. On this
+Ubuntu system, use the narrower cache-only command below so the network remains
+connected.
+
+1. Open Terminal.
+2. Run:
+
+       sudo resolvectl flush-caches
+
+3. Enter your system password if requested. No output normally means success.
+4. Run:
+
+       resolvectl status
+
+5. Find and record the `Current DNS Server` and the DNS servers associated with
+   the active interface.
+6. Run:
+
+       ip -brief address
+
+7. Record the active interface's local IPv4 address. Also note that Ubuntu may
+   send the application's first DNS query to the local stub resolver
+   `127.0.0.53`; this is why the DNS capture below uses the `any` interface.
+
+Screenshot checkpoint `screenshots/17-dns-resolver-settings.png`:
+Show the active interface, its local IP, and the relevant `Current DNS Server`
+lines. Multiple screenshots with `-1`, `-2` are acceptable if needed.
+
+C2. Capture a dig query
+-----------------------
+
+1. Return to Wireshark.
+2. Click `File` -> `Close` and preserve the previous capture if prompted.
+3. Click `Capture` -> `Options...`.
+4. Select only the interface named `any`. Capturing on `any` ensures the trace
+   includes a query sent to the local loopback stub as well as any upstream query
+   visible on the physical interface.
+5. Leave `Capture Filter` empty.
+6. Click `Output`.
+7. Set the file to `CNL2/dns.pcap`.
+8. Set `Output format` to pcap, not pcapng.
+9. Click `Start`.
+10. Switch immediately to Terminal and run:
+
+       dig sina.sharif.edu A
+
+11. Wait for the complete output. Record the `SERVER:` line, status, flags,
+    QUESTION SECTION, ANSWER SECTION, and query time.
+
+Screenshot checkpoint `screenshots/18-dns-dig-output.png`:
+Capture the complete `dig` result. If it does not fit, capture at least the
+header/QUESTION/ANSWER in `-1` and the `SERVER`/Query time lines in `-2`.
+
+12. Return to Wireshark.
+13. Click `Capture` -> `Stop`.
+14. Click `File` -> `Save` and verify `dns.pcap` exists.
+
+C3. Isolate the DNS packets involving your host
+------------------------------------------------
+
+1. Enter this broad filter first:
+
+       dns && dns.qry.name == "sina.sharif.edu"
+
+2. Inspect the source/destination addresses of the query and response.
+3. If the query uses the active interface's real IPv4 address, replace
+   `YOUR_IP` below and apply:
+
+       dns && ip.addr == YOUR_IP
+
+4. If the application talks to the Ubuntu local stub, use:
+
+       dns && ip.addr == 127.0.0.1
+
+5. Do not type quotation marks around the IP address. The correct Wireshark field
+   order is `ip.addr == value`.
+6. Identify the query destination IP and the matching response source IP. They
+   answer which DNS server received the request and which server returned the
+   response at the observed hop. Do not silently replace an observed loopback
+   stub address with an upstream address from `resolvectl`; explain both if both
+   are relevant.
+
+Screenshot checkpoint `screenshots/19-dns-request-response-list.png`:
+Show the host-IP filter, matching query and response rows, packet numbers, source,
+destination, protocol, and Info columns.
+
+C4. Analyze the DNS request header
+----------------------------------
+
+1. Apply:
+
+       dns.flags.response == 0 && dns.qry.name == "sina.sharif.edu"
+
+2. Select the query packet.
+3. Expand `Internet Protocol Version 4` (or IPv6 if actually used).
+4. Record source and destination addresses.
+5. Expand `User Datagram Protocol` and record source/destination ports. If your
+   actual query uses TCP, expand TCP and report that instead.
+6. Expand `Domain Name System (query)`.
+7. Record `Transaction ID`.
+8. Expand `Flags` and record every displayed flag/value, especially:
+
+   - Response (QR)
+   - Opcode
+   - Truncated (TC)
+   - Recursion desired (RD)
+   - Z/reserved bits
+   - any other flags shown by your version
+
+9. Record `Questions`, `Answer RRs`, `Authority RRs`, and `Additional RRs`.
+10. Expand `Queries` and record Name, Type, and Class.
+
+Screenshot checkpoint `screenshots/20-dns-request-header.png`:
+Show the query-only filter, selected query, IP/UDP endpoints, transaction ID,
+fully expanded Flags, count fields, and expanded Queries. Use `-1` and `-2` if
+one screen cannot show all fields legibly.
+
+C5. Analyze the matching DNS reply header
+-----------------------------------------
+
+1. Apply:
+
+       dns.flags.response == 1 && dns.qry.name == "sina.sharif.edu"
+
+2. Select the response with the same transaction ID as the query.
+3. Expand `Internet Protocol Version 4` (or IPv6) and verify that source and
+   destination reverse relative to the request.
+4. Expand UDP/TCP and record the ports.
+5. Expand `Domain Name System (response)`.
+6. Verify and record the same `Transaction ID`.
+7. Expand `Flags` and record every value, especially:
+
+   - Response (QR)
+   - Opcode
+   - Authoritative Answer (AA)
+   - Truncated (TC)
+   - Recursion desired (RD)
+   - Recursion available (RA)
+   - Z/reserved bits
+   - Reply code (RCODE)
+
+8. Record the four section counts.
+9. Expand `Queries` and `Answers`.
+10. For every answer resource record, record Name, Type, Class, TTL, data length,
+    and returned value/IP. If `Authorities` or `Additional records` are nonempty,
+    expand and record those too.
+
+Screenshot checkpoint `screenshots/21-dns-response-header.png`:
+Show the response-only filter, selected matching response, IP/UDP endpoints,
+transaction ID, fully expanded response flags, and section counts.
+
+Screenshot checkpoint `screenshots/22-dns-answer-records.png`:
+Show all expanded Answer records and their Type, TTL, and returned values. Use
+numbered continuations if necessary.
+
+Record for the report after Part C
+----------------------------------
+
+- Active interface and local IP: __________
+- Local stub resolver, if used: __________
+- Configured upstream DNS server(s): __________
+- Observed query destination server: __________
+- Observed response source server: __________
+- Query frame and response frame: __________ -> __________
+- Transaction ID: __________
+- Transport and ports: __________
+- Query header flags and counts: __________
+- Reply header flags, RCODE, and counts: __________
+- Query Name/Type/Class: __________
+- Answer records, TTLs, and values: __________
+
+
+FINAL COMPLETENESS CHECK
+========================
+
+Before writing the answers/report
+---------------------------------
+
+[ ] `http.pcap` opens and contains HTTP, TCP, and DNS packets.
+[ ] `telehack-live.pcap` opens and contains the live port 23 stream.
+[ ] The course-supplied `telnet.pcap` is present and was analyzed separately.
+[ ] `dns.pcap` opens and contains the matching DNS query and reply.
+[ ] Every blank in the three recording sections above has an observed value.
+[ ] Every claimed value has a named screenshot and can also be verified in pcap.
+[ ] Recovered images open successfully.
+[ ] No real personal password was used or exposed.
+
+Minimum screenshot-to-question mapping
+--------------------------------------
+
+- HTTP Host verification: `03-http-get-host.png`
+- Major protocol volumes: `04-http-protocol-hierarchy.png`
+- GET-to-OK delay: `05-http-get-ok-time.png`
+- Absolute TCP sequence number: `06-http-absolute-sequence.png`
+- DNS query/response types inside HTTP capture: `07` and `08`
+- Recovered images: `09` and `10`
+- Live Telnet observations: `11`, `12`, and `13`
+- Supplied Telnet client/server: `14`
+- Supplied Telnet password and commands: `15` and `16`
+- DNS server identity and dig output: `17`, `18`, and `19`
+- DNS request/reply header analysis: `20`, `21`, and `22`
+
+Submission naming and contents
+------------------------------
+
+The assignment requires all experiment files in one zip archive and gives this
+pattern:
+
+    STDNum-GroupNum-ClassNum-ExperimentNum.zip
+
+For Experiment 2, the safest concrete pattern is:
+
+    <STDNum>-<GroupNum>-<ClassNum>-2.zip
+
+Use the same stem for the final PDF:
+
+    <STDNum>-<GroupNum>-<ClassNum>-2.pdf
+
+Place the PDF, all relevant `.pcap` files (including the supplied
+`telnet.pcap`), and the requested implementation evidence inside the zip. The
+grading criteria explicitly require the pcap captures to accompany the PDF.
+
+
+AUTHORITATIVE REFERENCES USED FOR THIS WALKTHROUGH
+==================================================
+
+1. CNL2 assignment PDF: `CNL2/آزمایش دوم.pdf` (all eight pages).
+2. Local grading rules: `Criterions.txt`.
+3. Wireshark User's Guide — Capture Options:
+   https://www.wireshark.org/docs/wsug_html_chunked/ChCapCaptureOptions.html
+4. Wireshark User's Guide — stopping a capture:
+   https://www.wireshark.org/docs/wsug_html_chunked/ChCapRunningSection.html
+5. Wireshark User's Guide — display filters:
+   https://www.wireshark.org/docs/wsug_html_chunked/ChWorkBuildDisplayFilterSection.html
+6. Wireshark User's Guide — Protocol Hierarchy:
+   https://www.wireshark.org/docs/wsug_html_chunked/ChStatHierarchy.html
+7. Wireshark User's Guide — following streams:
+   https://www.wireshark.org/docs/wsug_html_chunked/ChAdvFollowStreamSection.html
+8. Wireshark User's Guide — exporting HTTP objects:
+   https://www.wireshark.org/docs/wsug_html_chunked/ChIOExportSection.html
+9. Wireshark display-filter reference — Telnet:
+   https://www.wireshark.org/docs/dfref/t/telnet.html
+10. RFC 1035 — DNS message/header and resource-record format:
+    https://www.rfc-editor.org/rfc/rfc1035.html
+11. RFC 854 — Telnet protocol:
+    https://www.rfc-editor.org/rfc/rfc854.html
+12. HTTP site required for this run:
+    http://sina.sharif.edu/~azad/
+13. Telehack site required for this run:
+    https://telehack.com/
