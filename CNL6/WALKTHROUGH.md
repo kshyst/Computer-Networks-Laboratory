@@ -287,6 +287,8 @@ Subnet Mask:    255.255.255.0
 Default Gateway: 192.168.0.1
 ```
 
+> **Screenshot checkpoint — `01-topology-and-addresses.png`:** همین حالا که هر دو سرور اضافه و IPها تنظیم شده‌اند، پنجره Command Prompt را ببندید، کل توپولوژی را در یک نما قرار دهید و تصویر بگیرید. نام همه دستگاه‌ها، اتصال‌های جدید `R1-SW2-Server1` و `Internet-Server0` و سبزبودن لینک‌ها باید دیده شوند. اگر IP labelها روی workspace نمایش داده می‌شوند، آن‌ها را هم داخل تصویر نگه دارید.
+
 #### G. تنظیمات انتقال‌یافته را دستگاه‌به‌دستگاه بررسی کنید
 
 روی `R1` paste کنید:
@@ -312,6 +314,8 @@ show ip nat statistics
 
 در این نقطه، R5 باید route شبکه `10.10.7.0/24` و default route به `213.80.11.5` را داشته باشد، ولی جدول NAT و فهرست inside/outside باید خالی باشند.
 
+> **Screenshot checkpoint — `01-r5-routes-before-nat.png`:** بلافاصله بعد از اجرای بلوک بررسی R5 و پیش از رفتن سراغ Internet تصویر بگیرید. خروجی route شبکه `10.10.7.0/24`، default route به `213.80.11.5` و خالی‌بودن NAT باید در تصویر قابل خواندن باشد؛ در صورت نیاز خروجی‌ها را جدا اجرا کنید و آخرین بخش‌های مرتبط را در یک قاب نگه دارید.
+
 روی `Internet` paste کنید:
 
 ```text
@@ -323,6 +327,8 @@ show ip nat statistics
 ```
 
 روی `Internet` فقط شبکه‌های متصل `213.80.11.0/24` و `192.168.0.0/24` باید دیده شوند؛ هیچ route به `10.10.*` و هیچ NAT فعالی نباید وجود داشته باشد.
+
+> **Screenshot checkpoint — `01-internet-routes-before-nat.png`:** همین‌جا از خروجی `show ip route` و خالی‌بودن `show ip nat translations` روی Internet تصویر بگیرید. شبکه‌های connected باید دیده شوند و هیچ مسیر `10.10.*` نباید در قاب باشد.
 
 #### H. اتصال‌های baseline را از هر دستگاه جداگانه آزمایش کنید
 
@@ -347,6 +353,8 @@ ping 192.168.0.1
 ```
 
 سه بلوک بالا باید موفق باشند. دسترسی `PC1` به `Server0` هنوز معیار baseline نیست، چون NAT مراحل بعدی عمداً پاک شده است.
+
+> **Screenshot checkpoint — `01-internal-connectivity.png`:** بعد از موفق‌شدن pingهای baseline و قبل از شروع بند ۲ تصویر بگیرید. ترجیحاً Command Prompt مربوط به PC1 را با هر دو پاسخ موفق `10.10.16.1` و `10.10.7.2` باز نگه دارید؛ اگر همه خروجی‌ها در یک قاب جا نمی‌شوند، تصاویر اضافی با پسوند `-a` و `-b` بگیرید.
 
 ### نتیجه مورد انتظار
 
@@ -413,6 +421,8 @@ show running-config interface FastEthernet0/0
 
 در تنظیمات `Fa0/0` خط `ip nat outside` دیده می‌شود و آدرس آن `213.80.11.5/24` است.
 
+> **Screenshot checkpoint — `02-internet-outside-interface.png`:** بلافاصله پس از اجرای بلوک بند ۲ و دیده‌شدن بخش `FastEthernet0/0` تصویر بگیرید. نام واسط، IP `213.80.11.5` و خط `ip nat outside` باید هم‌زمان خوانا باشند.
+
 ### شاهد لازم
 
 `02-internet-outside-interface.png`.
@@ -451,6 +461,8 @@ ping 192.168.0.2
 
 این ping باید پیش از NAT هم موفق باشد، چون شبکه مستقیماً متصل است.
 
+> **Screenshot checkpoint — `03-internet-inside-interface.png`:** پس از موفق‌شدن ping `192.168.0.2` و پیش از بند ۴ تصویر بگیرید. در همان قاب یا یک قاب خوانا، بخش `FastEthernet0/1` با IP `192.168.0.1` و `ip nat inside` و نتیجه ping موفق را نشان دهید.
+
 ### شاهد لازم
 
 `03-internet-inside-interface.png`.
@@ -488,6 +500,8 @@ show ip nat statistics
 
 یک ردیف دائمی با `Inside global = 213.80.11.6` و `Inside local = 192.168.0.2` دیده می‌شود.
 
+> **Screenshot checkpoint — `04-internet-static-nat-config-and-table.png`:** بلافاصله بعد از اجرای بلوک بند ۴ و پیش از ایجاد هر ترافیک تصویر بگیرید. جدول باید نگاشت دائمی `192.168.0.2 <-> 213.80.11.6` را نشان دهد و prompt دستگاه Internet نیز در قاب مشخص باشد.
+
 ### شاهد لازم
 
 `04-internet-static-nat-config-and-table.png`.
@@ -514,16 +528,28 @@ enable
 clear ip nat translation *
 ```
 
-3. در `PC1 > Desktop > Command Prompt` بلوک زیر را paste کنید:
+3. در `PC1 > Desktop > Command Prompt` ابتدا فقط ping عمومی را اجرا کنید:
 
 ```text
 ping 213.80.11.6
+```
+
+> **Screenshot checkpoint — `05-ping-server0-public.png`:** به‌محض تمام‌شدن همین ping و پیش از اجرای ping بعدی، از Command Prompt تصویر بگیرید. فرمان، هر چهار پاسخ یا timeout و آدرس مقصد `213.80.11.6` باید کامل دیده شوند.
+
+حالا ping آدرس private را جدا اجرا کنید:
+
+```text
 ping 192.168.0.2
 ```
+
+> **Screenshot checkpoint — `05-ping-server0-private.png`:** بلافاصله بعد از تمام‌شدن ping دوم تصویر بگیرید. فرمان، نتیجه کامل و مقصد `192.168.0.2` باید دیده شوند تا با تصویر قبلی قابل مقایسه باشد.
 
 4. بسته عمومی را در `Internet` باز کنید و مقایسه کنید:
    - قبل از NAT مقصد `213.80.11.6` است؛
    - بعد از NAT مقصد `192.168.0.2` می‌شود.
+
+> **Screenshot checkpoint — `05-static-nat-pdu-before-after.png`:** در Simulation دقیقاً وقتی بسته روی Internet انتخاب شده است تصویر بگیرید. پنجره PDU باید آدرس مقصد پیش از NAT یعنی `213.80.11.6` و پس از NAT یعنی `192.168.0.2` را نشان دهد؛ Event List را نیز در قاب نگه دارید.
+
 5. بسته مستقیم به `192.168.0.2` را بررسی کنید؛ این بسته از نگاشت static مقصد استفاده نمی‌کند، چون از ابتدا مقصد local را دارد.
 6. بلافاصله روی `Internet` بلوک زیر را paste و جدول را ثبت کنید:
 
@@ -531,6 +557,8 @@ ping 192.168.0.2
 enable
 show ip nat translations
 ```
+
+> **Screenshot checkpoint — `05-internet-nat-table-after-ping.png`:** بلافاصله پس از اجرای این فرمان و قبل از پاک‌کردن یا تولید ترافیک جدید تصویر بگیرید. نگاشت static و هر ورودی ICMP مرتبط باید خوانا باشند.
 
 ### نتیجه مورد انتظار
 
@@ -575,11 +603,25 @@ show ip nat translations
 show ip nat statistics
 ```
 
+> **Screenshot checkpoint — `06-internet-nat-table-during-static-test.png`:** درست در همین توقف Simulation و پیش از ادامه‌دادن بسته تصویر بگیرید. جدول NAT، counters و زمان قرارگرفتن بسته پس از خروج از Internet به سمت Server0 باید مستند شوند.
+
 4. در `Server0 > Desktop > Command Prompt` بلوک زیر را paste کنید:
 
 ```text
 ping 10.10.7.2
 ```
+
+> **Screenshot checkpoint — `06-server0-to-server1-before-r5-nat.png`:** پس از تمام‌شدن ping ناموفق Server0 و پیش از تغییر تنظیمات R5 تصویر بگیرید. آدرس مقصد و timeoutها باید کامل دیده شوند.
+
+برای ثبت علت شکست، بلوک زیر را روی `Internet` paste کنید:
+
+```text
+enable
+show ip route 10.10.7.0
+show ip route
+```
+
+> **Screenshot checkpoint — `06-internet-route-explaining-failure.png`:** بلافاصله پس از اجرای بلوک route تصویر بگیرید. نبود route برای `10.10.7.0/24` و وجود فقط شبکه‌های connected باید مشخص باشد.
 
 ### نتیجه مورد انتظار
 
@@ -622,6 +664,8 @@ show running-config
 
 واسط دارای آدرس `213.80.11.4/24` با `ip nat outside` مشخص شده است.
 
+> **Screenshot checkpoint — `07-r5-outside-interface.png`:** بلافاصله پس از اجرای بلوک بند ۷ تصویر بگیرید. بخش `FastEthernet1/0`، آدرس `213.80.11.4` و خط `ip nat outside` باید در یک قاب دیده شوند.
+
 ### شاهد لازم
 
 `07-r5-outside-interface.png`.
@@ -660,6 +704,8 @@ show running-config
 
 آدرس‌های آن‌ها باید به‌ترتیب `10.10.11.2/24` و `10.10.12.2/24` باشند.
 
+> **Screenshot checkpoint — `08-r5-inside-interfaces.png`:** بعد از اجرای بلوک بند ۸ و قبل از ساخت ACL تصویر بگیرید. هر دو بخش `FastEthernet0/0` و `FastEthernet0/1` باید خط `ip nat inside` و IP صحیح خود را نشان دهند؛ اگر در یک صفحه جا نمی‌شوند از پسوندهای `-a` و `-b` استفاده کنید.
+
 ### شاهد لازم
 
 `08-r5-inside-interfaces.png`.
@@ -694,6 +740,8 @@ show access-lists 1
 ### نتیجه مورد انتظار
 
 `Standard IP access list 1` شبکه‌های واقعی میزبان‌های داخلی را permit می‌کند.
+
+> **Screenshot checkpoint — `09-r5-nat-acl.png`:** بلافاصله بعد از `show access-lists 1` تصویر بگیرید. شماره ACL، عبارت permit برای `10.10.0.0 0.0.255.255` و در مراحل بعد counterهای match باید خوانا باشند.
 
 ### شاهد لازم
 
@@ -731,6 +779,8 @@ show running-config | include ip nat pool
 
 pool `NetLab` شامل ۱۴ آدرس قابل استفاده است و با شبکه خارجی توپولوژی سازگار است.
 
+> **Screenshot checkpoint — `10-r5-netlab-pool.png`:** بلافاصله پس از اجرای بلوک بند ۱۰ و دیده‌شدن خط `ip nat pool NetLab 213.80.11.17 213.80.11.30 ...` تصویر بگیرید. ابتدا و انتهای بازه و netmask باید کامل باشند.
+
 ### شاهد لازم
 
 `10-r5-netlab-pool.png`.
@@ -761,6 +811,8 @@ show ip nat statistics
 ### راستی‌آزمایی اولیه
 
 قبل از تولید ترافیک، جدول ممکن است خالی باشد. پس از ping بند ۱۲ باید نگاشت dynamic ظاهر شود.
+
+> **Screenshot checkpoint — `11-r5-dynamic-nat-config.png`:** همین حالا، پیش از اجرای ping بند ۱۲، تصویر بگیرید. خروجی `show ip nat statistics` باید association مربوط به `list 1 pool NetLab` و نقش‌های inside/outside را نشان دهد؛ خالی‌بودن translation table در این لحظه طبیعی است.
 
 ### شاهد لازم
 
@@ -794,6 +846,8 @@ clear ip nat translation *
 ping 213.80.11.6
 ```
 
+> **Screenshot checkpoint — `12-dynamic-public-ping.png`:** به‌محض تمام‌شدن ping عمومی و پیش از اجرای ping private تصویر بگیرید. مقصد `213.80.11.6` و نتیجه کامل باید دیده شوند.
+
 4. پس از عبور بسته از `R5` بلوک زیر را روی `R5` paste و جدول را فوراً ثبت کنید:
 
 ```text
@@ -802,6 +856,8 @@ show ip nat translations
 show ip nat statistics
 ```
 
+> **Screenshot checkpoint — `12-r5-dynamic-nat-table.png`:** بلافاصله بعد از اولین ping و قبل از timeout شدن entry تصویر بگیرید. `Inside local = 10.10.6.1`، آدرس اختصاص‌یافته از pool و counters باید خوانا باشند.
+
 5. پس از عبور از `Internet`، بلوک زیر را روی `Internet` paste کنید:
 
 ```text
@@ -809,11 +865,19 @@ enable
 show ip nat translations
 ```
 
+> **Screenshot checkpoint — `12-internet-static-nat-table.png`:** همین‌جا از جدول Internet تصویر بگیرید. نگاشت static `192.168.0.2 <-> 213.80.11.6` و ورودی مرتبط با جریان جاری باید مشخص باشد.
+
+در Simulation روی همان ICMP، PDU را هنگام عبور از R5 و سپس Internet باز کنید.
+
+> **Screenshot checkpoint — `12-pdu-double-nat-before-after.png`:** پیش از اجرای ping private تصویر بگیرید. در یک قاب یا تصاویر `-a` و `-b` نشان دهید که R5 source را از `10.10.6.1` به آدرس pool و Internet مقصد را از `213.80.11.6` به `192.168.0.2` تغییر داده است؛ Event List را نیز نگه دارید.
+
 6. سپس در `PC1 > Desktop > Command Prompt` آزمایش را برای آدرس واقعی تکرار کنید:
 
 ```text
 ping 192.168.0.2
 ```
+
+> **Screenshot checkpoint — `12-dynamic-private-ping.png`:** بلافاصله بعد از پایان ping private و پیش از پاک‌کردن translationها تصویر بگیرید. مقصد `192.168.0.2` و پاسخ یا timeout کامل باید دیده شوند.
 
 ### نتیجه مورد انتظار
 
@@ -854,6 +918,8 @@ ping 192.168.0.2
 ping 10.10.7.2
 ```
 
+> **Screenshot checkpoint — `13-server0-to-server1-dynamic-failure.png`:** به‌محض پایان ping و پیش از ساخت static NAT بند ۱۸ تصویر بگیرید. فرمان، مقصد private و همه timeoutها باید دیده شوند.
+
 برای نشان‌دادن مرز NAT، یک آزمایش دوم نیز با آدرس عمومی‌ای انجام دهید که هنوز برای Server1 تعریف نشده است؛ در این مرحله نباید نگاشت static برای Server1 وجود داشته باشد.
 
 ### نتیجه مورد انتظار
@@ -868,6 +934,8 @@ ping 10.10.7.2
 enable
 show ip nat translations
 ```
+
+> **Screenshot checkpoint — `13-r5-table-no-static-server1.png`:** بلافاصله پس از اجرای این فرمان تصویر بگیرید. جدول باید نشان دهد هیچ نگاشت دائمی برای `10.10.7.2` وجود ندارد؛ اگر entryهای دیگر هستند، ستون‌ها را کامل نگه دارید.
 
 ### شواهد لازم
 
@@ -897,6 +965,8 @@ show ip nat statistics
 
 association مربوط به `list 1 pool NetLab` حذف و جدول ترجمه موقت خالی است. خود ACL و pool هنوز وجود دارند تا در بند ۱۵ استفاده شوند.
 
+> **Screenshot checkpoint — `14-dynamic-nat-disabled.png`:** بلافاصله پس از اجرای بلوک بند ۱۴ و پیش از فعال‌کردن PAT تصویر بگیرید. `show ip nat statistics` باید نبود association فعال Dynamic NAT و خالی‌بودن translationها را نشان دهد.
+
 ### شاهد لازم
 
 `14-dynamic-nat-disabled.png`.
@@ -919,6 +989,8 @@ end
 clear ip nat translation *
 ```
 
+> **Screenshot checkpoint — `15-pat-pool-config.png`:** بلافاصله پس از اجرای بلوک و پیش از تولید ترافیک تصویر بگیرید. بخش NAT در running configuration یا `show ip nat statistics` باید عبارت `pool NetLab overload` را نشان دهد.
+
 از دو میزبان داخلی تقریباً هم‌زمان ترافیک ایجاد کنید.
 
 در `PC1 > Desktop > Command Prompt` paste کنید:
@@ -933,6 +1005,8 @@ ping 213.80.11.6
 ping 213.80.11.6
 ```
 
+> **Screenshot checkpoint — `15-pat-two-hosts.png`:** پس از تمام‌شدن هر دو ping و قبل از timeout شدن NAT entryها تصویر بگیرید. اگر دو Command Prompt در یک قاب جا می‌شوند هر دو را نشان دهید؛ در غیر این صورت فایل‌های `15-pat-two-hosts-a.png` و `15-pat-two-hosts-b.png` بسازید.
+
 سپس روی `R5` paste کنید:
 
 ```text
@@ -940,6 +1014,8 @@ enable
 show ip nat translations
 show ip nat statistics
 ```
+
+> **Screenshot checkpoint — `15-pat-pool-table.png`:** بلافاصله پس از pingهای دو میزبان تصویر بگیرید. جدول باید دو جریان، آدرس‌های inside local متفاوت و استفاده اشتراکی از آدرس global به‌همراه شناسه‌های ICMP را نشان دهد.
 
 ### نتیجه مورد انتظار
 
@@ -977,6 +1053,8 @@ show ip nat statistics
 4. پروتکل و شناسه بعد از علامت `:` را نیز مقایسه کنید.
 5. تعداد `Total active translations` را از `show ip nat statistics` ثبت کنید.
 
+> **Screenshot checkpoint — `16-dynamic-vs-pat-table-comparison.png`:** پس از قرار دادن تصاویر Dynamic NAT و PAT کنار هم و علامت‌گذاری ستون‌های مورد مقایسه، از نمای نهایی مقایسه تصویر بگیرید. هر دو جدول و تفاوت آدرس/identifier باید خوانا باشند.
+
 ### نتیجه مورد انتظار
 
 در Dynamic NAT تفاوت اصلی در آدرس‌های global است؛ در PAT تمایز جریان‌ها علاوه بر آدرس با port/identifier انجام می‌شود.
@@ -1008,6 +1086,8 @@ end
 clear ip nat translation *
 ```
 
+> **Screenshot checkpoint — `17-pat-interface-config.png`:** بلافاصله پس از اجرای بلوک و پیش از pingها تصویر بگیرید. configuration یا statistics باید `interface FastEthernet1/0 overload` را نشان دهد و association قبلی pool نباید فعال باشد.
+
 از سه میزبان داخلی ترافیک ایجاد کنید.
 
 در `PC1 > Desktop > Command Prompt` paste کنید:
@@ -1028,6 +1108,8 @@ ping 213.80.11.6
 ping 213.80.11.6
 ```
 
+> **Screenshot checkpoint — `17-pat-interface-three-hosts.png`:** بعد از تمام‌شدن ping هر سه میزبان و پیش از timeout entryها تصویر بگیرید. اگر سه پنجره در یک قاب خوانا نیستند از پسوندهای `-a`، `-b` و `-c` استفاده کنید.
+
 سپس روی `R5` paste کنید:
 
 ```text
@@ -1035,6 +1117,8 @@ enable
 show ip nat translations
 show ip nat statistics
 ```
+
+> **Screenshot checkpoint — `17-pat-interface-table.png`:** بلافاصله پس از سه ping تصویر بگیرید. همه entryها باید `Inside global = 213.80.11.4` داشته باشند و با identifierهای متفاوت جدا شده باشند.
 
 ### نتیجه مورد انتظار
 
@@ -1089,11 +1173,15 @@ show ip nat translations
 show ip nat statistics
 ```
 
+> **Screenshot checkpoint — `18-r5-server1-static-nat-table.png`:** پیش از اجرای ping Server0 تصویر بگیرید. نگاشت دائمی `10.10.7.2 <-> 213.80.11.32` باید در جدول R5 دیده شود.
+
 3. در `Server0 > Desktop > Command Prompt` آدرس global را ping کنید، نه آدرس خصوصی Server1:
 
 ```text
 ping 213.80.11.32
 ```
+
+> **Screenshot checkpoint — `18-server0-ping-server1-global-success.png`:** بلافاصله بعد از ping موفق و پیش از بستن Command Prompt تصویر بگیرید. مقصد global و چهار reply موفق باید کامل دیده شوند.
 
 4. در `Simulation` مسیر را دنبال کنید:
    - `Server0` بسته را به gateway یعنی `192.168.0.1` می‌دهد؛
@@ -1101,6 +1189,18 @@ ping 213.80.11.32
    - `R5` برای global static پاسخ ARP می‌دهد و مقصد را از `213.80.11.32` به `10.10.7.2` تبدیل می‌کند؛
    - پاسخ Server1 در R5، source را از `10.10.7.2` به `213.80.11.32` تبدیل می‌کند؛
    - پاسخ در `Internet` در جهت outside-to-inside، destination را از `213.80.11.6` به `192.168.0.2` برمی‌گرداند.
+
+> **Screenshot checkpoint — `18-static-nat-pdu-before-after.png`:** وقتی رفت‌وبرگشت ICMP در Simulation کامل شد تصویر بگیرید. تبدیل source روی Internet، تبدیل destination روی R5 و تبدیل‌های معکوس پاسخ را در یک قاب یا تصاویر `-a` و `-b` ثبت کنید و Event List را نگه دارید.
+
+پس از کامل‌شدن ping و Simulation، بلوک زیر را روی `R5` paste کنید:
+
+```text
+enable
+show ip nat translations
+show ip nat statistics
+```
+
+> **Screenshot checkpoint — `18-r5-final-nat-statistics.png`:** این آخرین تصویر بند ۱۸ است. آن را بلافاصله بعد از بلوک بالا بگیرید تا نگاشت static، counters نهایی و نقش‌های inside/outside هم‌زمان ثبت شوند.
 
 در نتیجه، چهار تبدیل اصلی مسیر کامل عبارت‌اند از:
 
@@ -1162,6 +1262,80 @@ Inside local:  10.10.7.2
 - [ ] ۱۶. جدول PAT و Dynamic NAT مقایسه شد.
 - [ ] ۱۷. PAT با آدرس `Fa1/0` اجرا شد.
 - [ ] ۱۸. static mapping برای Server1 ساخته و ping از Server0 با آدرس global آزمایش شد.
+
+# فهرست نهایی اسکرین‌شات‌های لازم
+
+این فهرست را در پایان کار با پوشه `screenshots/` تطبیق دهید. هر فایل باید هم در checkpoint همان مرحله گرفته شده باشد و هم اینجا تیک بخورد. فایل‌های دارای پسوند `-a`، `-b` یا `-c` فقط وقتی لازم‌اند که اطلاعات خواسته‌شده در یک تصویر خوانا جا نشود.
+
+## بند ۱ — آماده‌سازی توپولوژی
+
+- [ ] `01-topology-and-addresses.png`
+- [ ] `01-r5-routes-before-nat.png`
+- [ ] `01-internet-routes-before-nat.png`
+- [ ] `01-internal-connectivity.png`
+
+## بندهای ۲ تا ۴ — Static NAT روی Internet
+
+- [ ] `02-internet-outside-interface.png`
+- [ ] `03-internet-inside-interface.png`
+- [ ] `04-internet-static-nat-config-and-table.png`
+
+## بند ۵ — آزمایش دو آدرس Server0
+
+- [ ] `05-ping-server0-public.png`
+- [ ] `05-ping-server0-private.png`
+- [ ] `05-static-nat-pdu-before-after.png`
+- [ ] `05-internet-nat-table-after-ping.png`
+
+## بند ۶ — جدول NAT و شکست دسترسی اولیه Server0 به Server1
+
+- [ ] `06-internet-nat-table-during-static-test.png`
+- [ ] `06-server0-to-server1-before-r5-nat.png`
+- [ ] `06-internet-route-explaining-failure.png`
+
+## بندهای ۷ تا ۱۱ — آماده‌سازی Dynamic NAT روی R5
+
+- [ ] `07-r5-outside-interface.png`
+- [ ] `08-r5-inside-interfaces.png`
+- [ ] `09-r5-nat-acl.png`
+- [ ] `10-r5-netlab-pool.png`
+- [ ] `11-r5-dynamic-nat-config.png`
+
+## بند ۱۲ — اجرای Dynamic NAT
+
+- [ ] `12-dynamic-public-ping.png`
+- [ ] `12-dynamic-private-ping.png`
+- [ ] `12-r5-dynamic-nat-table.png`
+- [ ] `12-internet-static-nat-table.png`
+- [ ] `12-pdu-double-nat-before-after.png`
+
+## بندهای ۱۳ و ۱۴ — بررسی و غیرفعال‌کردن Dynamic NAT
+
+- [ ] `13-server0-to-server1-dynamic-failure.png`
+- [ ] `13-r5-table-no-static-server1.png`
+- [ ] `14-dynamic-nat-disabled.png`
+
+## بندهای ۱۵ و ۱۶ — PAT با pool و مقایسه
+
+- [ ] `15-pat-pool-config.png`
+- [ ] `15-pat-two-hosts.png`
+- [ ] `15-pat-pool-table.png`
+- [ ] `16-dynamic-vs-pat-table-comparison.png`
+
+## بند ۱۷ — PAT با IP واسط
+
+- [ ] `17-pat-interface-config.png`
+- [ ] `17-pat-interface-three-hosts.png`
+- [ ] `17-pat-interface-table.png`
+
+## بند ۱۸ — Static NAT برای Server1
+
+- [ ] `18-r5-server1-static-nat-table.png`
+- [ ] `18-server0-ping-server1-global-success.png`
+- [ ] `18-static-nat-pdu-before-after.png`
+- [ ] `18-r5-final-nat-statistics.png`
+
+**تعداد پایه مورد انتظار: ۳۸ اسکرین‌شات.** تصاویر اضافه با پسوندهای `-a`، `-b` و `-c` در این تعداد محاسبه نشده‌اند.
 
 # نکات مهم
 
