@@ -52,6 +52,7 @@ clear ip nat translation *
 ```
 
 6. اگر Packet Tracer فرمانی را با نام کوتاه قبول نکرد، نام کامل واسط را با `show ip interface brief` پیدا کنید.
+7. همه بلوک‌های اجرایی این راهنما بدون promptهایی مانند `R1#` یا `R5(config)#` نوشته شده‌اند. نام دستگاه دقیقاً بالای هر بلوک آمده است؛ فقط همان بلوک را در همان دستگاه paste کنید.
 
 ## ناسازگاری‌های خود سند اصلی و تصمیم اجرایی این راهنما
 
@@ -171,55 +172,181 @@ show ip interface brief
 
 ساخت یک baseline سالم تا تفاوت نتیجه NAT با خرابی ساده آدرس‌دهی یا مسیریابی اشتباه گرفته نشود.
 
-### روش اجرا
+### تبدیل دقیق فایل آزمایش ۵ به توپولوژی آزمایش ۶
 
-1. فایل `../CNL5/5/final/OSPF.pkt` را باز کنید.
-2. با `Save As` آن را به `CNL6/KiarashShojaei-6-2-6.pkt` ذخیره کنید.
-3. بررسی کنید دستگاه‌های `PC1`، `PC3`، `R1` تا `R5`، `Internet` و مسیرهای شکل ۱ موجود باشند.
-4. در صورت نبودن `Server1`، یک `Server-PT` و `SW2` اضافه و آن را به واسط آزاد `R1` متصل کنید.
-5. در صورت نبودن `Server0`، یک `Server-PT` اضافه و آن را به `Fa0/1` مسیریاب `Internet` متصل کنید.
-6. آدرس‌ها و gatewayها را دقیقاً طبق جدول بالا تنظیم کنید.
-7. روی همه واسط‌های استفاده‌شده `no shutdown` اجرا کنید.
-8. روی روترها `show ip interface brief` بگیرید و همه لینک‌های مورد استفاده را `up/up` کنید.
-9. مسیریابی داخلی آزمایش ۵ را نگه دارید، اما پروتکل مسیریابی را روی لینک خارجی `213.80.11.0/24` فعال نکنید.
-10. چون شبکه `Server1` در فایل آزمایش ۵ وجود نداشته است، آن را به پروتکل داخلی اضافه کنید. در مسیر پیشنهادی OSPF:
+#### A. فایل پایه را بدون بازنویسی آزمایش ۵ آماده کنید
+
+1. فایل `../CNL5/5/final/OSPF.pkt` را در Packet Tracer باز کنید.
+2. بلافاصله `File > Save As` را بزنید و فایل را با نام `CNL6/KiarashShojaei-6-2-6.pkt` ذخیره کنید.
+3. از این لحظه فقط روی نسخه آزمایش ۶ کار کنید.
+
+#### B. دستگاه‌ها و کابل‌های جدید را دقیقاً اضافه کنید
+
+1. یک `2960-24TT` با نام `SW2` اضافه کنید.
+2. یک `Server-PT` با نام `Server1` اضافه کنید.
+3. با کابل `Copper Straight-Through` این اتصال‌ها را بسازید:
+   - `R1 FastEthernet1/1` به `SW2 FastEthernet0/1`؛
+   - `Server1 FastEthernet0` به `SW2 FastEthernet0/2`.
+4. یک `Server-PT` دیگر با نام `Server0` اضافه کنید.
+5. با `Automatically Choose Connection Type` یا کابل `Copper Cross-Over`، `Internet FastEthernet0/1` را مستقیم به `Server0 FastEthernet0` وصل کنید.
+6. صبر کنید همه لینک‌های جدید سبز شوند. اگر `R1` واسط `FastEthernet1/1` ندارد، فایل پایه اشتباه است؛ فایل نهایی OSPF آزمایش ۵ باید ماژول `NM-2FE2W` را داشته باشد.
+
+#### C. NAT باقی‌مانده از آزمایش ۵ را روی R5 پاک کنید
+
+فایل نهایی آزمایش ۵ از قبل PAT دارد. برای اینکه مراحل ۷ تا ۱۸ آزمایش ۶ واقعی و قابل مشاهده باشند، ابتدا آن NAT را پاک کنید. بلوک زیر را کامل و یک‌جا در CLI دستگاه `R5` paste کنید:
 
 ```text
-R1# configure terminal
-R1(config)# router ospf 1
-R1(config-router)# network 10.10.7.0 0.0.0.255 area 0
-R1(config-router)# end
+enable
+configure terminal
+no ip nat inside source list 1 interface FastEthernet1/0 overload
+no access-list 1
+interface FastEthernet0/0
+ no ip nat inside
+exit
+interface FastEthernet0/1
+ no ip nat inside
+exit
+interface FastEthernet1/0
+ no ip nat outside
+ ip address 213.80.11.4 255.255.255.0
+ no shutdown
+exit
+ip route 0.0.0.0 0.0.0.0 213.80.11.5
+router ospf 1
+ default-information originate
+end
+clear ip nat translation *
+write memory
 ```
 
-اگر فایل پایه شما EIGRP یا RIPv2 است، همین شبکه را با syntax همان پروتکل اعلان کنید. هیچ network statement برای `213.80.11.0/24` روی `R5` اضافه نکنید.
-11. روی `R5` یک مسیر پیش‌فرض به `Internet` قرار دهید و آن را به شبکه داخلی اعلام کنید. در مسیر OSPF:
+اگر یکی از فرمان‌های `no ...` پیام داد که تنظیم مورد نظر وجود ندارد، همان پیام فقط یعنی آن مورد از قبل پاک بوده است؛ ادامه دهید.
+
+#### D. واسط جدید R1 و شبکه Server1 را تنظیم کنید
+
+بلوک زیر را کامل در CLI دستگاه `R1` paste کنید:
 
 ```text
-R5# configure terminal
-R5(config)# ip route 0.0.0.0 0.0.0.0 213.80.11.5
-R5(config)# router ospf 1
-R5(config-router)# default-information originate
-R5(config-router)# end
+enable
+configure terminal
+interface FastEthernet1/1
+ description TO-SW2-SERVER1
+ ip address 10.10.7.1 255.255.255.0
+ no shutdown
+exit
+router ospf 1
+ network 10.10.7.0 0.0.0.255 area 0
+ passive-interface FastEthernet1/1
+end
+write memory
 ```
 
-12. روی `Internet` هر مسیر به `10.10.0.0/16` یا زیرشبکه‌های داخلی را حذف کنید. فقط شبکه‌های متصل `213.80.11.0/24` و `192.168.0.0/24` باید در جدول آن دیده شوند.
-13. قبل از NAT، اتصال‌های داخلی و رسیدن default route به روترهای داخلی را آزمایش کنید:
+فایل OSPF آزمایش ۵ از قبل `network 10.10.0.0 0.0.255.255 area 0` و `passive-interface default` دارد؛ دو خط OSPF بالا صریحاً شبکه جدید را ثبت می‌کنند و روی LAN سرور همسایگی OSPF نمی‌سازند.
+
+#### E. دو واسط مسیریاب Internet را برای توپولوژی جدید آماده کنید
+
+بلوک زیر را کامل در CLI دستگاه `Internet` paste کنید. نقش‌های NAT عمداً پاک می‌شوند تا در بندهای ۲ و ۳ خود آزمایش اضافه شوند:
 
 ```text
-PC1> ping 10.10.16.1
-PC1> ping 10.10.7.2
-R1# show ip route 10.10.7.0
-R1# show ip route 0.0.0.0
-R5# show ip route 10.10.7.0
+enable
+configure terminal
+interface FastEthernet0/0
+ description TO-SW4-R5
+ ip address 213.80.11.5 255.255.255.0
+ no ip nat outside
+ no shutdown
+exit
+interface FastEthernet0/1
+ description TO-SERVER0
+ ip address 192.168.0.1 255.255.255.0
+ no ip nat inside
+ no shutdown
+exit
+no ip nat inside source static 192.168.0.2 213.80.11.6
+end
+clear ip nat translation *
+write memory
 ```
 
-`R5` باید مسیر برگشت `10.10.7.0/24` و دیگر LANهای داخلی را بداند؛ `Internet` نباید هیچ‌یک از آن‌ها را بداند. این تمایز برای بازگشت بسته بعد از NAT ضروری است.
-14. روی `R5` و `Internet` خروجی زیر را ثبت کنید:
+روی `Internet` هیچ OSPF، EIGRP، RIP یا مسیر static به شبکه‌های `10.10.*` اضافه نکنید.
+
+#### F. IP دو سرور را از رابط گرافیکی تنظیم کنید
+
+روی `Server1` به `Desktop > IP Configuration` بروید و دقیقاً وارد کنید:
 
 ```text
-show ip route
+IP Address:      10.10.7.2
+Subnet Mask:    255.255.255.0
+Default Gateway: 10.10.7.1
+```
+
+روی `Server0` به `Desktop > IP Configuration` بروید و دقیقاً وارد کنید:
+
+```text
+IP Address:      192.168.0.2
+Subnet Mask:    255.255.255.0
+Default Gateway: 192.168.0.1
+```
+
+#### G. تنظیمات انتقال‌یافته را دستگاه‌به‌دستگاه بررسی کنید
+
+روی `R1` paste کنید:
+
+```text
+enable
 show ip interface brief
+show ip route 10.10.7.0
+show ip route 0.0.0.0
+show ip ospf interface brief
 ```
+
+روی `R5` paste کنید:
+
+```text
+enable
+show ip interface brief
+show ip route 10.10.7.0
+show ip route 0.0.0.0
+show ip nat translations
+show ip nat statistics
+```
+
+در این نقطه، R5 باید route شبکه `10.10.7.0/24` و default route به `213.80.11.5` را داشته باشد، ولی جدول NAT و فهرست inside/outside باید خالی باشند.
+
+روی `Internet` paste کنید:
+
+```text
+enable
+show ip interface brief
+show ip route
+show ip nat translations
+show ip nat statistics
+```
+
+روی `Internet` فقط شبکه‌های متصل `213.80.11.0/24` و `192.168.0.0/24` باید دیده شوند؛ هیچ route به `10.10.*` و هیچ NAT فعالی نباید وجود داشته باشد.
+
+#### H. اتصال‌های baseline را از هر دستگاه جداگانه آزمایش کنید
+
+در `PC1 > Desktop > Command Prompt` paste کنید:
+
+```text
+ping 10.10.16.1
+ping 10.10.7.2
+```
+
+در `Server1 > Desktop > Command Prompt` paste کنید:
+
+```text
+ping 10.10.7.1
+ping 10.10.6.1
+```
+
+در `Server0 > Desktop > Command Prompt` paste کنید:
+
+```text
+ping 192.168.0.1
+```
+
+سه بلوک بالا باید موفق باشند. دسترسی `PC1` به `Server0` هنوز معیار baseline نیست، چون NAT مراحل بعدی عمداً پاک شده است.
 
 ### نتیجه مورد انتظار
 
@@ -231,11 +358,22 @@ show ip interface brief
 
 ### راستی‌آزمایی
 
+روی `R5` paste کنید:
+
 ```text
-R5# show ip route
-Internet# show ip route
-R5# show ip nat translations
-Internet# show ip nat translations
+enable
+show ip route
+show ip nat translations
+show ip nat statistics
+```
+
+روی `Internet` paste کنید:
+
+```text
+enable
+show ip route
+show ip nat translations
+show ip nat statistics
 ```
 
 ### شواهد لازم
@@ -308,7 +446,7 @@ show running-config
 از `Internet` خود `Server0` را ping کنید:
 
 ```text
-Internet# ping 192.168.0.2
+ping 192.168.0.2
 ```
 
 این ping باید پیش از NAT هم موفق باشد، چون شبکه مستقیماً متصل است.
@@ -369,27 +507,29 @@ show ip nat statistics
 ### روش اجرا
 
 1. در `Simulation` فقط `ARP` و `ICMP` را فعال کنید.
-2. ترجمه‌های موقت را پاک کنید، اما نگاشت static باقی می‌ماند:
+2. روی `Internet` بلوک زیر را paste کنید تا ترجمه‌های موقت پاک شوند؛ نگاشت static در configuration باقی می‌ماند:
 
 ```text
-Internet# clear ip nat translation *
+enable
+clear ip nat translation *
 ```
 
-3. از `PC1` اجرا کنید:
+3. در `PC1 > Desktop > Command Prompt` بلوک زیر را paste کنید:
 
 ```text
-PC1> ping 213.80.11.6
-PC1> ping 192.168.0.2
+ping 213.80.11.6
+ping 192.168.0.2
 ```
 
 4. بسته عمومی را در `Internet` باز کنید و مقایسه کنید:
    - قبل از NAT مقصد `213.80.11.6` است؛
    - بعد از NAT مقصد `192.168.0.2` می‌شود.
 5. بسته مستقیم به `192.168.0.2` را بررسی کنید؛ این بسته از نگاشت static مقصد استفاده نمی‌کند، چون از ابتدا مقصد local را دارد.
-6. بلافاصله جدول را ثبت کنید:
+6. بلافاصله روی `Internet` بلوک زیر را paste و جدول را ثبت کنید:
 
 ```text
-Internet# show ip nat translations
+enable
+show ip nat translations
 ```
 
 ### نتیجه مورد انتظار
@@ -427,14 +567,15 @@ Internet# show ip nat translations
 
 1. در `Simulation` یک ping از `PC1` به `213.80.11.6` بسازید.
 2. درست پس از عبور بسته از `Internet` به سمت `Server0` اجرای شبیه‌سازی را متوقف کنید.
-3. روی `Internet` اجرا کنید:
+3. روی `Internet` بلوک زیر را paste کنید:
 
 ```text
+enable
 show ip nat translations
 show ip nat statistics
 ```
 
-4. در `Server0 > Desktop > Command Prompt` اجرا کنید:
+4. در `Server0 > Desktop > Command Prompt` بلوک زیر را paste کنید:
 
 ```text
 ping 10.10.7.2
@@ -572,11 +713,7 @@ show access-lists 1
 
 ### روش اجرا
 
-فرمان نمونه PDF عیناً به صورت زیر چاپ شده است:
-
-```text
-R1(config)# ip nat pool NetLab 203.0.113.4 203.0.113.14 netmask 255.255.255.240
-```
+فرمان نمونه PDF، پس از حذف prompt غیرقابل‌کپی `R1(config)#`، این است: `ip nat pool NetLab 203.0.113.4 203.0.113.14 netmask 255.255.255.240`. **این فرمان را اجرا نکنید**؛ فقط برای ثبت ناسازگاری سند آورده شده است.
 
 این فرمان با متن همان بند که بازه `213.80.11.16` تا `213.80.11.31` را می‌خواهد و با شبکه خارجی شکل ۱ ناسازگار است. علاوه بر آن، آدرس‌های `.16` و `.31` در بلوک `/28` به‌ترتیب network و broadcast هستند و قابل واگذاری به میزبان نیستند. بنابراین جایگزین اجرایی امن و متصل، بازه `.17` تا `.30` است:
 
@@ -643,36 +780,39 @@ show ip nat statistics
 
 ### روش اجرا
 
-1. ترجمه‌های قبلی R5 را پاک کنید:
+1. روی `R5` بلوک زیر را paste کنید تا ترجمه‌های قبلی پاک شوند:
 
 ```text
-R5# clear ip nat translation *
+enable
+clear ip nat translation *
 ```
 
 2. در `Simulation` فیلتر `ICMP` و `ARP` را فعال کنید.
-3. از `PC1` اجرا کنید:
+3. در `PC1 > Desktop > Command Prompt` بلوک زیر را paste کنید:
 
 ```text
 ping 213.80.11.6
 ```
 
-4. پس از عبور بسته از `R5` جدول را فوراً ثبت کنید:
+4. پس از عبور بسته از `R5` بلوک زیر را روی `R5` paste و جدول را فوراً ثبت کنید:
 
 ```text
-R5# show ip nat translations
-R5# show ip nat statistics
+enable
+show ip nat translations
+show ip nat statistics
 ```
 
-5. پس از عبور از `Internet`، جدول آن را نیز ثبت کنید:
+5. پس از عبور از `Internet`، بلوک زیر را روی `Internet` paste کنید:
 
 ```text
-Internet# show ip nat translations
+enable
+show ip nat translations
 ```
 
-6. سپس آزمایش را برای آدرس واقعی تکرار کنید:
+6. سپس در `PC1 > Desktop > Command Prompt` آزمایش را برای آدرس واقعی تکرار کنید:
 
 ```text
-PC1> ping 192.168.0.2
+ping 192.168.0.2
 ```
 
 ### نتیجه مورد انتظار
@@ -708,8 +848,10 @@ PC1> ping 192.168.0.2
 
 ### روش اجرا
 
+در `Server0 > Desktop > Command Prompt` بلوک زیر را paste کنید:
+
 ```text
-Server0> ping 10.10.7.2
+ping 10.10.7.2
 ```
 
 برای نشان‌دادن مرز NAT، یک آزمایش دوم نیز با آدرس عمومی‌ای انجام دهید که هنوز برای Server1 تعریف نشده است؛ در این مرحله نباید نگاشت static برای Server1 وجود داشته باشد.
@@ -720,10 +862,11 @@ Server0> ping 10.10.7.2
 
 ### راستی‌آزمایی
 
-در `R5` بررسی کنید که برای `Server1 = 10.10.7.2` نگاشت ورودی دائمی وجود ندارد:
+در `R5` بررسی کنید که برای `Server1 = 10.10.7.2` نگاشت ورودی دائمی وجود ندارد. بلوک زیر را روی `R5` paste کنید:
 
 ```text
-R5# show ip nat translations
+enable
+show ip nat translations
 ```
 
 ### شواهد لازم
@@ -776,18 +919,26 @@ end
 clear ip nat translation *
 ```
 
-از دو میزبان داخلی تقریباً هم‌زمان ترافیک ایجاد کنید:
+از دو میزبان داخلی تقریباً هم‌زمان ترافیک ایجاد کنید.
+
+در `PC1 > Desktop > Command Prompt` paste کنید:
 
 ```text
-PC1> ping 213.80.11.6
-PC3> ping 213.80.11.6
+ping 213.80.11.6
 ```
 
-سپس اجرا کنید:
+در `PC3 > Desktop > Command Prompt` paste کنید:
 
 ```text
-R5# show ip nat translations
-R5# show ip nat statistics
+ping 213.80.11.6
+```
+
+سپس روی `R5` paste کنید:
+
+```text
+enable
+show ip nat translations
+show ip nat statistics
 ```
 
 ### نتیجه مورد انتظار
@@ -857,19 +1008,32 @@ end
 clear ip nat translation *
 ```
 
-از دو یا سه میزبان داخلی ترافیک ایجاد کنید:
+از سه میزبان داخلی ترافیک ایجاد کنید.
+
+در `PC1 > Desktop > Command Prompt` paste کنید:
 
 ```text
-PC1> ping 213.80.11.6
-PC3> ping 213.80.11.6
-Server1> ping 213.80.11.6
+ping 213.80.11.6
 ```
 
-سپس:
+در `PC3 > Desktop > Command Prompt` paste کنید:
 
 ```text
-R5# show ip nat translations
-R5# show ip nat statistics
+ping 213.80.11.6
+```
+
+در `Server1 > Desktop > Command Prompt` paste کنید:
+
+```text
+ping 213.80.11.6
+```
+
+سپس روی `R5` paste کنید:
+
+```text
+enable
+show ip nat translations
+show ip nat statistics
 ```
 
 ### نتیجه مورد انتظار
@@ -917,17 +1081,18 @@ end
 clear ip nat translation *
 ```
 
-2. نگاشت static را بررسی کنید:
+2. نگاشت static را با paste کردن بلوک زیر روی `R5` بررسی کنید:
 
 ```text
-R5# show ip nat translations
-R5# show ip nat statistics
+enable
+show ip nat translations
+show ip nat statistics
 ```
 
-3. از `Server0` آدرس global را ping کنید، نه آدرس خصوصی Server1:
+3. در `Server0 > Desktop > Command Prompt` آدرس global را ping کنید، نه آدرس خصوصی Server1:
 
 ```text
-Server0> ping 213.80.11.32
+ping 213.80.11.32
 ```
 
 4. در `Simulation` مسیر را دنبال کنید:
