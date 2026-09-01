@@ -412,16 +412,15 @@ interface FastEthernet0/0
  ip nat outside
  no shutdown
 end
-show running-config interface FastEthernet0/0
+show ip interface brief
+show ip nat statistics
 ```
-
-اگر `show running-config interface` در Packet Tracer پشتیبانی نشد، از `show running-config` استفاده کنید.
 
 ### نتیجه مورد انتظار و راستی‌آزمایی
 
-در تنظیمات `Fa0/0` خط `ip nat outside` دیده می‌شود و آدرس آن `213.80.11.5/24` است.
+در `show ip interface brief`، واسط `Fa0/0` باید آدرس `213.80.11.5` و وضعیت `up/up` داشته باشد. در `show ip nat statistics` نیز `FastEthernet0/0` باید زیر `Outside interfaces` دیده شود.
 
-> **Screenshot checkpoint — `02-internet-outside-interface.png`:** بلافاصله پس از اجرای بلوک بند ۲ و دیده‌شدن بخش `FastEthernet0/0` تصویر بگیرید. نام واسط، IP `213.80.11.5` و خط `ip nat outside` باید هم‌زمان خوانا باشند.
+> **Screenshot checkpoint — `02-internet-outside-interface.png`:** بلافاصله پس از اجرای بلوک بند ۲ تصویر بگیرید. خروجی `show ip interface brief` باید IP و وضعیت `Fa0/0` را نشان دهد و خروجی `show ip nat statistics` باید `FastEthernet0/0` را در فهرست outside نشان دهد.
 
 ### شاهد لازم
 
@@ -444,12 +443,13 @@ interface FastEthernet0/1
  ip nat inside
  no shutdown
 end
-show running-config
+show ip interface brief
+show ip nat statistics
 ```
 
 ### نتیجه مورد انتظار
 
-`Fa0/1` با آدرس `192.168.0.1/24` نقش `inside` دارد.
+در `show ip interface brief`، واسط `Fa0/1` با آدرس `192.168.0.1` باید `up/up` باشد. در `show ip nat statistics` نیز `FastEthernet0/1` باید زیر `Inside interfaces` دیده شود.
 
 ### راستی‌آزمایی
 
@@ -461,7 +461,7 @@ ping 192.168.0.2
 
 این ping باید پیش از NAT هم موفق باشد، چون شبکه مستقیماً متصل است.
 
-> **Screenshot checkpoint — `03-internet-inside-interface.png`:** پس از موفق‌شدن ping `192.168.0.2` و پیش از بند ۴ تصویر بگیرید. در همان قاب یا یک قاب خوانا، بخش `FastEthernet0/1` با IP `192.168.0.1` و `ip nat inside` و نتیجه ping موفق را نشان دهید.
+> **Screenshot checkpoint — `03-internet-inside-interface.png`:** پس از موفق‌شدن ping `192.168.0.2` و پیش از بند ۴ تصویر بگیرید. خروجی `show ip interface brief` باید `Fa0/1 = 192.168.0.1` و `up/up` را نشان دهد، خروجی `show ip nat statistics` باید آن را در فهرست inside نشان دهد و نتیجه ping نیز باید ثبت شود.
 
 ### شاهد لازم
 
@@ -657,14 +657,15 @@ interface FastEthernet1/0
  ip nat outside
  no shutdown
 end
-show running-config
+show ip interface brief
+show ip nat statistics
 ```
 
 ### نتیجه مورد انتظار
 
-واسط دارای آدرس `213.80.11.4/24` با `ip nat outside` مشخص شده است.
+در `show ip interface brief`، واسط `Fa1/0` باید آدرس `213.80.11.4` و وضعیت `up/up` داشته باشد. در `show ip nat statistics` نیز `FastEthernet1/0` باید زیر `Outside interfaces` دیده شود.
 
-> **Screenshot checkpoint — `07-r5-outside-interface.png`:** بلافاصله پس از اجرای بلوک بند ۷ تصویر بگیرید. بخش `FastEthernet1/0`، آدرس `213.80.11.4` و خط `ip nat outside` باید در یک قاب دیده شوند.
+> **Screenshot checkpoint — `07-r5-outside-interface.png`:** بلافاصله پس از اجرای بلوک بند ۷ تصویر بگیرید. خروجی interface brief باید IP و وضعیت `Fa1/0` و خروجی NAT statistics باید نقش outside آن را نشان دهد.
 
 ### شاهد لازم
 
@@ -691,7 +692,8 @@ interface FastEthernet0/1
  ip nat inside
  no shutdown
 end
-show running-config
+show ip interface brief
+show ip nat statistics
 ```
 
 ### توضیح
@@ -704,7 +706,7 @@ show running-config
 
 آدرس‌های آن‌ها باید به‌ترتیب `10.10.11.2/24` و `10.10.12.2/24` باشند.
 
-> **Screenshot checkpoint — `08-r5-inside-interfaces.png`:** بعد از اجرای بلوک بند ۸ و قبل از ساخت ACL تصویر بگیرید. هر دو بخش `FastEthernet0/0` و `FastEthernet0/1` باید خط `ip nat inside` و IP صحیح خود را نشان دهند؛ اگر در یک صفحه جا نمی‌شوند از پسوندهای `-a` و `-b` استفاده کنید.
+> **Screenshot checkpoint — `08-r5-inside-interfaces.png`:** بعد از اجرای بلوک بند ۸ و قبل از ساخت ACL تصویر بگیرید. `show ip interface brief` باید IP و وضعیت `Fa0/0` و `Fa0/1` را نشان دهد و `show ip nat statistics` باید هر دو را زیر `Inside interfaces` فهرست کند.
 
 ### شاهد لازم
 
@@ -770,16 +772,14 @@ enable
 configure terminal
 ip nat pool NetLab 213.80.11.17 213.80.11.30 netmask 255.255.255.240
 end
-show running-config | include ip nat pool
+show ip nat statistics
 ```
-
-اگر pipe در Packet Tracer پشتیبانی نشد، `show running-config` را بدون pipe اجرا کنید.
 
 ### نتیجه مورد انتظار
 
 pool `NetLab` شامل ۱۴ آدرس قابل استفاده است و با شبکه خارجی توپولوژی سازگار است.
 
-> **Screenshot checkpoint — `10-r5-netlab-pool.png`:** بلافاصله پس از اجرای بلوک بند ۱۰ و دیده‌شدن خط `ip nat pool NetLab 213.80.11.17 213.80.11.30 ...` تصویر بگیرید. ابتدا و انتهای بازه و netmask باید کامل باشند.
+> **Screenshot checkpoint — `10-r5-netlab-pool.png`:** بلافاصله پس از اجرای بلوک بند ۱۰ تصویر بگیرید. خروجی `show ip nat statistics` باید pool با نام `NetLab`، بازه `213.80.11.17` تا `213.80.11.30` و netmask مرتبط را نشان دهد.
 
 ### شاهد لازم
 
