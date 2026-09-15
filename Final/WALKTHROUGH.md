@@ -1,80 +1,80 @@
-# راهنمای کامل آزمون پایان‌ترم آزمایشگاه شبکه
+# Complete Guide to the Network Laboratory Final Exam
 
-این راهنما برای ساخت سناریوی نهایی در **Cisco Packet Tracer** نوشته شده است. همه فرمان‌ها بدون Prompt هستند و هر بلوک فقط روی دستگاهی اجرا می‌شود که بلافاصله بالای آن نام برده شده است.
+This guide is written for building the final scenario in **Cisco Packet Tracer**. All commands are without a Prompt, and each block is executed only on the device named immediately above it.
 
-## خروجی‌های رسمی آزمون
+## Official Exam Deliverables
 
-طبق صفحه نخست صورت سؤال:
+According to the first page of the question sheet:
 
-- آزمون انفرادی است و پروژه باید مستقل ساخته شود.
-- فقط فایل شبیه‌سازی Packet Tracer با پسوند `.pkt` و ویدیوی اجرای پروژه تحویل داده می‌شوند.
-- تهیه گزارش متنی Word یا PDF لازم نیست.
-- در ابتدای ویدیو ساختار سناریو کوتاه معرفی و سپس تمام تست‌های اجباری به‌ترتیب اجرا شوند.
-- مدت پیشنهادی ویدیو حداکثر ۱۰ دقیقه است.
-- مهلت درج‌شده در صورت سؤال پایان روز شنبه ۱۳ تیر است.
+- The exam is individual, and the project must be built independently.
+- Only the Packet Tracer simulation file with the `.pkt` extension and a video of the project execution are submitted.
+- Preparing a written Word or PDF report is not required.
+- At the beginning of the video, briefly introduce the scenario structure and then run all mandatory tests in order.
+- The recommended video duration is a maximum of 10 minutes.
+- The deadline stated in the question sheet is the end of Saturday, 13 Tir.
 
-Checkpointهای PNG این راهنما فقط برای کنترل شخصی و آماده‌سازی ویدیو هستند و جزو فایل‌های رسمی تحویل نیستند. هر Checkpoint که چند دستگاه یا چند پنجره دارد می‌تواند با پسوندهای `-a`، `-b` و `-c` به چند تصویر خوانا تقسیم شود؛ نام پایه و تعداد ۳۲ Checkpoint تغییر نمی‌کند.
+The PNG Checkpoints in this guide are only for personal checking and video preparation and are not part of the official submission files. Any Checkpoint containing multiple devices or multiple windows can be divided into several readable images using the suffixes `-a`, `-b` and `-c`; the base name and the count of 32 Checkpoints do not change.
 
 ---
 
-# ۱. تفسیر عملی دو تناقض آدرس‌دهی صورت سؤال
+# 1. Practical Interpretation of Two Addressing Contradictions in the Question Sheet
 
-دو مقدار ماسک در PDF با بقیه الزام‌ها ناسازگارند. راه‌حل زیر یک **تفسیر عملی برای Packet Tracer** است و اجرای لفظ‌به‌لفظ همان دو ماسک نیست؛ زیرا اجرای لفظی، تست‌های اجباری را غیرممکن می‌کند.
+Two mask values in the PDF are inconsistent with the other requirements. The solution below is a **practical interpretation for Packet Tracer**, not a literal implementation of those two masks; a literal implementation makes the mandatory tests impossible.
 
-صورت سؤال از آدرس‌های زیر استفاده می‌کند:
+The question sheet uses the following addresses:
 
-- لینک `ISP ↔ R-EDGE`: آدرس‌های `203.0.113.1` و `203.0.113.2`
-- آدرس عمومی PAT: `203.0.113.10`
-- آدرس عمومی وب: `203.0.113.20`
-- کاربر اینترنت: `203.0.113.50/24`
+- `ISP ↔ R-EDGE` link: addresses `203.0.113.1` and `203.0.113.2`
+- Public PAT address: `203.0.113.10`
+- Public web address: `203.0.113.20`
+- Internet user: `203.0.113.50/24`
 
-اگر لینک ISP با ماسک `/30` ساخته شود، آدرس‌های `.10`، `.20` و `.50` خارج از آن زیرشبکه خواهند بود و آزمایش‌های اجباری NAT در Packet Tracer به‌صورت مستقیم کار نمی‌کنند. برای حفظ تمام IPهای الزامی و اجرای واقعی آزمایش‌ها، بخش خارجی در این راهنما یک شبکه `/24` است:
+If the ISP link is built with a `/30` mask, addresses `.10`, `.20` and `.50` will be outside that subnet, and the mandatory NAT tests in Packet Tracer will not work directly. To preserve all mandatory IPs and actually run the tests, the external segment in this guide is a `/24` network:
 
 ```text
 203.0.113.0/24
 ```
 
-همچنین استفاده از `10.10.0.1/16` روی لینک `R-EDGE ↔ SW-CORE` با SVIهای `10.10.x.0/28` روی SW-CORE هم‌پوشانی ایجاد می‌کند. لینک مسیریابی با حفظ IP داده‌شده R-EDGE به‌صورت زیر ساخته می‌شود:
+Also, using `10.10.0.1/16` on the `R-EDGE ↔ SW-CORE` link creates an overlap with the `10.10.x.0/28` SVIs on SW-CORE. The routing link is built as follows while preserving the given R-EDGE IP:
 
 ```text
 R-EDGE Gi0/0/1 = 10.10.0.1/30
 SW-CORE Gi0/1 = 10.10.0.2/30
 ```
 
-این دو اصلاح فقط ماسک لینک‌ها را سازگار می‌کنند؛ همه آدرس‌های VLAN، سرورها، NAT و کاربر اینترنت دقیقاً مطابق صورت سؤال باقی می‌مانند.
+These two corrections only make the link masks consistent; all VLAN, server, NAT and Internet user addresses remain exactly as specified in the question sheet.
 
 ---
 
-# ۲. تجهیزات موردنیاز
+# 2. Required Equipment
 
-در یک پروژه خالی این تجهیزات را قرار دهید:
+Place the following equipment in an empty project:
 
-- دو روتر **Cisco ISR 4321** با نام‌های `R-EDGE` و `ISP`
-- یک سوئیچ **3560-24PS** با نام `SW-CORE`
-- چهار سوئیچ **2960-24TT** با نام‌های `SW-F1`، `SW-F2`، `SW-F3` و `INTERNET-SW`
-- هجده PC داخلی، دو PC برای هر تیم
-- یک PC با نام `Internet-User`
-- پنج Server-PT با نام‌های `WEB1`، `WEB2`، `TEST`، `DNS` و `DNS-ISP`
+- Two **Cisco ISR 4321** routers named `R-EDGE` and `ISP`
+- One **3560-24PS** switch named `SW-CORE`
+- Four **2960-24TT** switches named `SW-F1`, `SW-F2`, `SW-F3` and `INTERNET-SW`
+- Eighteen internal PCs, two PCs for each team
+- One PC named `Internet-User`
+- Five Server-PTs named `WEB1`, `WEB2`, `TEST`, `DNS` and `DNS-ISP`
 
-نام PCها:
+PC names:
 
-| طبقه | VLAN | PC اول | PC دوم |
+| Floor | VLAN | First PC | Second PC |
 |---|---:|---|---|
-| طبقه ۱ | 10 | `PC-S1` | `PC-S2` |
-| طبقه ۱ | 11 | `PC-M1` | `PC-M2` |
-| طبقه ۱ | 12 | `PC-U1` | `PC-U2` |
-| طبقه ۲ | 20 | `PC-B1` | `PC-B2` |
-| طبقه ۲ | 21 | `PC-F1` | `PC-F2` |
-| طبقه ۲ | 22 | `PC-Q1` | `PC-Q2` |
-| طبقه ۳ | 30 | `PC-FN1` | `PC-FN2` |
-| طبقه ۳ | 31 | `PC-H1` | `PC-H2` |
-| طبقه ۳ | 32 | `PC-N1` | `PC-N2` |
+| Floor 1 | 10 | `PC-S1` | `PC-S2` |
+| Floor 1 | 11 | `PC-M1` | `PC-M2` |
+| Floor 1 | 12 | `PC-U1` | `PC-U2` |
+| Floor 2 | 20 | `PC-B1` | `PC-B2` |
+| Floor 2 | 21 | `PC-F1` | `PC-F2` |
+| Floor 2 | 22 | `PC-Q1` | `PC-Q2` |
+| Floor 3 | 30 | `PC-FN1` | `PC-FN2` |
+| Floor 3 | 31 | `PC-H1` | `PC-H2` |
+| Floor 3 | 32 | `PC-N1` | `PC-N2` |
 
-## اتصال کابل‌ها
+## Cable Connections
 
-از **Automatically Choose Connection Type** استفاده کنید. سوئیچ `INTERNET-SW` فقط نقش بخش چنددسترسی Cloud/ISP شکل را در Packet Tracer بازی می‌کند و جزئی از Campus شرکت نیست.
+Use **Automatically Choose Connection Type**. The `INTERNET-SW` switch only serves as the multi-access Cloud/ISP segment of the diagram in Packet Tracer and is not part of the company Campus.
 
-| مبدأ | پورت | مقصد | پورت |
+| Source | Port | Destination | Port |
 |---|---|---|---|
 | R-EDGE | `Gi0/0/0` | INTERNET-SW | `Gi0/1` |
 | ISP | `Gi0/0/0` | INTERNET-SW | `Gi0/2` |
@@ -89,15 +89,15 @@ SW-CORE Gi0/1 = 10.10.0.2/30
 | TEST | `Fa0` | SW-CORE | `Fa0/3` |
 | DNS | `Fa0` | SW-CORE | `Fa0/4` |
 
-روی هر Access Switch، شش PC را به‌ترتیب به `Fa0/1` تا `Fa0/6` متصل کنید.
+On each Access Switch, connect the six PCs in order to `Fa0/1` through `Fa0/6`.
 
-**Checkpoint `F-01-topology.png`:** از کل توپولوژی عکس بگیرید؛ نام همه دستگاه‌ها و کابل‌های بین Edge، Core و سه Access Switch خوانا باشند.
+**Checkpoint `F-01-topology.png`:** Take a picture of the entire topology; the names of all devices and the cables between the Edge, Core and three Access Switches must be readable.
 
 ---
 
-# ۳. جدول نهایی آدرس‌دهی
+# 3. Final Addressing Table
 
-| VLAN | نام | شبکه | Gateway | روش کلاینت‌ها |
+| VLAN | Name | Network | Gateway | Client Method |
 |---:|---|---|---|---|
 | 10 | Sales | `10.10.10.0/28` | `10.10.10.1` | DHCP |
 | 11 | Marketing | `10.10.11.0/28` | `10.10.11.1` | DHCP |
@@ -107,14 +107,14 @@ SW-CORE Gi0/1 = 10.10.0.2/30
 | 22 | QA | `10.10.22.0/28` | `10.10.22.1` | DHCP |
 | 30 | Finance | `10.10.30.0/28` | `10.10.30.1` | DHCP |
 | 31 | HR | `10.10.31.0/28` | `10.10.31.1` | DHCP |
-| 32 | Network | `10.10.32.0/28` | `10.10.32.1` | Static برای دو عضو تیم شبکه |
-| 99 | Management | `10.10.99.0/28` | `10.10.99.1` | Static برای سوئیچ‌ها |
+| 32 | Network | `10.10.32.0/28` | `10.10.32.1` | Static for the two network team members |
+| 99 | Management | `10.10.99.0/28` | `10.10.99.1` | Static for switches |
 | 100 | Server Farm | `10.10.100.0/28` | `10.10.100.1` | Static |
-| 999 | Native | بدون IP | بدون Gateway | فقط Trunk |
+| 999 | Native | No IP | No Gateway | Trunk only |
 
-آدرس‌های ثابت:
+Static addresses:
 
-| دستگاه | IP | Mask | Gateway | DNS |
+| Device | IP | Mask | Gateway | DNS |
 |---|---|---|---|---|
 | WEB1 | `10.10.100.10` | `255.255.255.240` | `10.10.100.1` | `10.10.100.13` |
 | WEB2 | `10.10.100.11` | `255.255.255.240` | `10.10.100.1` | `10.10.100.13` |
@@ -127,9 +127,9 @@ SW-CORE Gi0/1 = 10.10.0.2/30
 
 ---
 
-# ۴. پیکربندی ISP و R-EDGE
+# 4. Configuring ISP and R-EDGE
 
-## دستگاه: ISP
+## Device: ISP
 
 ```text
 enable
@@ -144,9 +144,9 @@ end
 write memory
 ```
 
-مسیر `10.10.0.0/16` فقط برای آن است که تست اجباری دسترسی Internet-User به TEST واقعاً تا ACL خارجی R-EDGE برسد و شمارنده deny افزایش یابد.
+The `10.10.0.0/16` route is only there so that the mandatory Internet-User access test to TEST actually reaches the external ACL on R-EDGE and increments the deny counter.
 
-## دستگاه: R-EDGE
+## Device: R-EDGE
 
 ```text
 enable
@@ -169,7 +169,7 @@ end
 write memory
 ```
 
-## دستگاه: R-EDGE — بررسی اولیه
+## Device: R-EDGE — Initial Check
 
 ```text
 enable
@@ -177,15 +177,15 @@ show ip interface brief
 show ip route
 ```
 
-انتظار می‌رود هر دو رابط `up/up` باشند و مسیر پیش‌فرض به `203.0.113.1` دیده شود.
+Both interfaces are expected to be `up/up`, and the default route to `203.0.113.1` should be visible.
 
-**Checkpoint `F-02-edge-isp-links.png`:** خروجی `show ip interface brief` و مسیر پیش‌فرض R-EDGE را ثبت کنید.
+**Checkpoint `F-02-edge-isp-links.png`:** Record the `show ip interface brief` output and the R-EDGE default route.
 
 ---
 
-# ۵. ساخت VLANها، SVIها و Trunkها
+# 5. Creating VLANs, SVIs and Trunks
 
-## دستگاه: SW-CORE
+## Device: SW-CORE
 
 ```text
 enable
@@ -296,7 +296,7 @@ end
 write memory
 ```
 
-## دستگاه: SW-F1
+## Device: SW-F1
 
 ```text
 enable
@@ -342,7 +342,7 @@ end
 write memory
 ```
 
-## دستگاه: SW-F2
+## Device: SW-F2
 
 ```text
 enable
@@ -388,7 +388,7 @@ end
 write memory
 ```
 
-## دستگاه: SW-F3
+## Device: SW-F3
 
 ```text
 enable
@@ -434,7 +434,7 @@ end
 write memory
 ```
 
-## دستگاه: SW-CORE — بررسی VLAN و Trunk
+## Device: SW-CORE — Checking VLAN and Trunk
 
 ```text
 enable
@@ -443,17 +443,17 @@ show interfaces trunk
 show ip interface brief
 ```
 
-**Checkpoint `F-03-core-vlans.png`:** همه VLANهای ۱۰، ۱۱، ۱۲، ۲۰، ۲۱، ۲۲، ۳۰، ۳۱، ۳۲، ۹۹، ۱۰۰ و ۹۹۹ را نشان دهید.
+**Checkpoint `F-03-core-vlans.png`:** Show all VLANs 10, 11, 12, 20, 21, 22, 30, 31, 32, 99, 100 and 999.
 
-**Checkpoint `F-04-core-trunks.png`:** سه Trunk فعال و Native VLAN برابر 999 را نشان دهید.
+**Checkpoint `F-04-core-trunks.png`:** Show three active Trunks and a Native VLAN of 999.
 
-**Checkpoint `F-05-core-svis.png`:** همه SVIها و رابط routed متصل به R-EDGE را در خروجی ثبت کنید.
+**Checkpoint `F-05-core-svis.png`:** Record all SVIs and the routed interface connected to R-EDGE in the output.
 
 ---
 
-# ۶. DHCP روی SW-CORE
+# 6. DHCP on SW-CORE
 
-## دستگاه: SW-CORE
+## Device: SW-CORE
 
 ```text
 enable
@@ -532,19 +532,19 @@ end
 write memory
 ```
 
-Pool مربوط به Server Farm برای رعایت عبارت «برای هر VLAN یک Pool» ساخته شده است، اما آدرس‌های `.1` تا `.13` از آن کنار گذاشته شده‌اند و چهار سرور حتماً Static باقی می‌مانند. برای VLAN مدیریت Pool ساخته نشده است، زیرا این VLAN اختیاری است و فقط تجهیزات با آدرس ثابت از آن استفاده می‌کنند.
+The Pool for the Server Farm is created to comply with the phrase “one Pool for each VLAN”, but addresses `.1` through `.13` are excluded from it, and the four servers must remain Static. No Pool is created for the management VLAN because this VLAN is optional and is used only by equipment with static addresses.
 
-برای هر VLAN ابتدا PC اول جدول نام‌گذاری را روی DHCP قرار دهید و فقط پس از دریافت آدرس، PC دوم همان VLAN را فعال کنید. این ترتیب در یک پروژه تازه باعث می‌شود PC اول آدرس `.2` و PC دوم آدرس `.3` را بگیرد. برای تمام PCهای VLANهای ۱۰، ۱۱، ۱۲، ۲۰، ۲۱، ۲۲، ۳۰ و ۳۱:
+For each VLAN, first set the first PC in the naming table to DHCP, and activate the second PC in the same VLAN only after an address has been received. In a fresh project, this order causes the first PC to receive address `.2` and the second PC to receive address `.3`. For all PCs in VLANs 10, 11, 12, 20, 21, 22, 30 and 31:
 
 1. `Desktop > IP Configuration`
-2. گزینه **DHCP** را انتخاب کنید.
-3. تا نمایش IP، Gateway و DNS صبر کنید.
+2. Select the **DHCP** option.
+3. Wait until the IP, Gateway and DNS are displayed.
 
-در VLAN 22 حتماً `PC-Q1` را پیش از `PC-Q2` روی DHCP قرار دهید و در Checkpoint همان‌جا تأیید کنید که `PC-Q1` آدرس `10.10.22.2` گرفته است. اگر پروژه از قبل Lease دارد، پیش از ادامه یک پروژه تازه بسازید یا Leaseهای قبلی را پاک کنید؛ تست‌های پایین بر مبنای این ترتیب قطعی نوشته شده‌اند.
+In VLAN 22, make sure to set `PC-Q1` to DHCP before `PC-Q2`, and confirm right there at the Checkpoint that `PC-Q1` has received address `10.10.22.2`. If the project already has Leases, create a fresh project or clear the previous Leases before continuing; the tests below are written based on this definite order.
 
-برای `PC-N1` و `PC-N2` از جدول آدرس‌های ثابت بخش ۳ استفاده کنید.
+For `PC-N1` and `PC-N2`, use the static address table in Section 3.
 
-## دستگاه: SW-CORE — بررسی DHCP
+## Device: SW-CORE — Checking DHCP
 
 ```text
 enable
@@ -552,45 +552,45 @@ show ip dhcp binding
 show ip dhcp pool
 ```
 
-**Checkpoint `F-06-dhcp-bindings.png`:** Leaseهای VLANهای مختلف و آدرس‌های MAC آن‌ها را ثبت کنید.
+**Checkpoint `F-06-dhcp-bindings.png`:** Record the Leases of the different VLANs and their MAC addresses.
 
-**Checkpoint `F-07-two-client-ipconfig.png`:** روی `PC-S1` و `PC-Q1` دستور `ipconfig` را اجرا و IP، Gateway و DNS را ثبت کنید. برای خوانایی، نام پایه را با پسوندهای `-a` برای PC-S1 و `-b` برای PC-Q1 تقسیم کنید.
+**Checkpoint `F-07-two-client-ipconfig.png`:** On `PC-S1` and `PC-Q1`, run the `ipconfig` command and record the IP, Gateway and DNS. For readability, split the base name using the suffixes `-a` for PC-S1 and `-b` for PC-Q1.
 
 ---
 
-# ۷. آدرس‌دهی و سرویس سرورها
+# 7. Server Addressing and Services
 
-روی هر سرور به `Desktop > IP Configuration` بروید و مقادیر جدول بخش ۳ را وارد کنید.
+On each server, go to `Desktop > IP Configuration` and enter the values from the table in Section 3.
 
 ## WEB1
 
 1. `Services > HTTP`
-2. HTTP را **On** کنید.
-3. فایل `index.html` را ویرایش کنید تا عبارت `NetLab WEB1 Production` واضح باشد.
+2. Turn HTTP **On**.
+3. Edit the `index.html` file so that the phrase `NetLab WEB1 Production` is clear.
 
 ## WEB2
 
 1. `Services > HTTP`
-2. HTTP را **On** کنید.
-3. فایل `index.html` را ویرایش کنید تا عبارت `NetLab WEB2 Backup Portal` واضح باشد.
+2. Turn HTTP **On**.
+3. Edit the `index.html` file so that the phrase `NetLab WEB2 Backup Portal` is clear.
 
 ## TEST
 
 1. `Services > HTTP`
-2. HTTP را **On** کنید.
-3. فایل `index.html` را ویرایش کنید تا عبارت `NetLab Internal TEST Server` واضح باشد.
+2. Turn HTTP **On**.
+3. Edit the `index.html` file so that the phrase `NetLab Internal TEST Server` is clear.
 
-**Checkpoint `F-08-server-addresses.png`:** IP ثابت هر چهار سرور داخلی را در دو یا چند نما ثبت کنید؛ `.10` تا `.13` و Gateway `.1` باید خوانا باشند.
+**Checkpoint `F-08-server-addresses.png`:** Record the static IPs of all four internal servers in two or more views; `.10` through `.13` and Gateway `.1` must be readable.
 
 ---
 
-# ۸. DNS داخلی و خارجی
+# 8. Internal and External DNS
 
-## دستگاه: DNS
+## Device: DNS
 
-1. به `Services > DNS` بروید.
-2. سرویس DNS را **On** کنید.
-3. رکوردهای زیر را یکی‌یکی با نوع `A Record` اضافه کنید:
+1. Go to `Services > DNS`.
+2. Turn the DNS service **On**.
+3. Add the following records one by one with the type `A Record`:
 
 | Name | Address |
 |---|---|
@@ -600,13 +600,13 @@ show ip dhcp pool
 | `test.netlab.ir` | `10.10.100.12` |
 | `ns.netlab.ir` | `10.10.100.13` |
 
-این رکوردها Split DNS داخلی را می‌سازند؛ `www` و `backup` از داخل مستقیماً به IP خصوصی می‌روند و به Hairpin NAT وابسته نیستند.
+These records create the internal Split DNS; `www` and `backup` go directly to private IPs from inside and do not depend on Hairpin NAT.
 
-## دستگاه: DNS-ISP
+## Device: DNS-ISP
 
-1. در `Desktop > IP Configuration` آدرس `203.0.113.53/24`، Gateway برابر `203.0.113.1` و DNS برابر خودش را تنظیم کنید.
-2. به `Services > DNS` بروید و DNS را **On** کنید.
-3. رکوردهای زیر را اضافه کنید:
+1. In `Desktop > IP Configuration`, set the address to `203.0.113.53/24`, the Gateway to `203.0.113.1` and the DNS to itself.
+2. Go to `Services > DNS` and turn DNS **On**.
+3. Add the following records:
 
 | Name | Address |
 |---|---|
@@ -616,11 +616,11 @@ show ip dhcp pool
 | `www.techcorp.ir` | `203.0.113.20` |
 | `backup.techcorp.ir` | `203.0.113.20` |
 
-صورت سؤال در جدول DNS از `netlab.ir` استفاده می‌کند، اما در یک بند NAT نام `techcorp.ir` آمده است. تعریف هر دو نام، این تناقض متنی را بدون تغییر مقصد عمومی حل می‌کند. برای TEST هیچ رکورد خارجی ایجاد نکنید.
+The question sheet uses `netlab.ir` in the DNS table, but one NAT clause mentions the name `techcorp.ir`. Defining both names resolves this textual contradiction without changing the public destination. Do not create any external record for TEST.
 
-## دستگاه: Internet-User
+## Device: Internet-User
 
-در `Desktop > IP Configuration` وارد کنید:
+Enter the following in `Desktop > IP Configuration`:
 
 ```text
 IP Address: 203.0.113.50
@@ -629,15 +629,15 @@ Default Gateway: 203.0.113.1
 DNS Server: 203.0.113.53
 ```
 
-**Checkpoint `F-09-internal-dns-records.png`:** پنج رکورد DNS داخلی را ثبت کنید.
+**Checkpoint `F-09-internal-dns-records.png`:** Record the five internal DNS records.
 
-**Checkpoint `F-10-external-dns-records.png`:** رکوردهای عمومی و نبود رکورد TEST را ثبت کنید.
+**Checkpoint `F-10-external-dns-records.png`:** Record the public records and the absence of a TEST record.
 
 ---
 
-# ۹. OSPF Area 0
+# 9. OSPF Area 0
 
-## دستگاه: SW-CORE
+## Device: SW-CORE
 
 ```text
 enable
@@ -652,7 +652,7 @@ end
 write memory
 ```
 
-## دستگاه: R-EDGE
+## Device: R-EDGE
 
 ```text
 enable
@@ -668,7 +668,7 @@ end
 write memory
 ```
 
-## دستگاه: SW-CORE — بررسی OSPF
+## Device: SW-CORE — Checking OSPF
 
 ```text
 enable
@@ -676,9 +676,9 @@ show ip ospf neighbor
 show ip route
 ```
 
-باید همسایه `2.2.2.2` در وضعیت `FULL` و مسیر پیش‌فرض OSPF با علامت `O*E2` دیده شود.
+Neighbor `2.2.2.2` should be visible in the `FULL` state, along with the OSPF default route marked `O*E2`.
 
-## دستگاه: R-EDGE — بررسی مسیرهای داخلی
+## Device: R-EDGE — Checking Internal Routes
 
 ```text
 enable
@@ -686,17 +686,17 @@ show ip ospf neighbor
 show ip route ospf
 ```
 
-باید مسیر VLANهای داخلی با حرف `O` دیده شوند.
+The internal VLAN routes should be visible with the letter `O`.
 
-**Checkpoint `F-11-ospf-neighbor.png`:** همسایگی FULL روی SW-CORE را ثبت کنید.
+**Checkpoint `F-11-ospf-neighbor.png`:** Record the FULL adjacency on SW-CORE.
 
-**Checkpoint `F-12-core-routing-table.png`:** مسیر پیش‌فرض و شبکه‌های متصل را ثبت کنید.
+**Checkpoint `F-12-core-routing-table.png`:** Record the default route and connected networks.
 
 ---
 
-# ۱۰. PAT و Port Forwarding روی R-EDGE
+# 10. PAT and Port Forwarding on R-EDGE
 
-## دستگاه: R-EDGE
+## Device: R-EDGE
 
 ```text
 enable
@@ -722,17 +722,17 @@ end
 write memory
 ```
 
-ACL مربوط به NAT برای همه VLANهای کاربری تعریف شده است، نه برای Server Farm، Management یا لینک Transit. کاربران Finance در پیکربندی پایه فقط ترافیک HTTP و DNS را می‌توانند از طریق PAT به اینترنت بفرستند؛ بنابراین سیاست «دسترسی محدود» حتی بدون بخش امتیازی زمان‌دار اجرا شده است.
+The NAT ACL is defined for all user VLANs, not for the Server Farm, Management, or the Transit link. In the base configuration, Finance users can only send HTTP and DNS traffic to the internet through PAT; therefore, the “restricted access” policy is enforced even without the time-based bonus section.
 
-هیچ NAT یا Port Forwarding برای `10.10.100.12` تعریف نکنید.
+Do not define any NAT or Port Forwarding for `10.10.100.12`.
 
-## دستگاه: PC-S1 — تولید PAT
+## Device: PC-S1 — Generate PAT
 
 ```text
 ping 203.0.113.1
 ```
 
-## دستگاه: R-EDGE — بررسی NAT
+## Device: R-EDGE — Check NAT
 
 ```text
 enable
@@ -740,19 +740,19 @@ show ip nat translations
 show ip nat statistics
 ```
 
-باید ترجمه PAT با Inside Local متعلق به PC-S1 و Inside Global برابر `203.0.113.10` دیده شود. دو نگاشت ثابت TCP نیز باید همیشه وجود داشته باشند.
+A PAT translation with an Inside Local belonging to PC-S1 and an Inside Global of `203.0.113.10` should be visible. The two static TCP mappings should also always be present.
 
-**Checkpoint `F-13-pat-translation.png`:** بلافاصله پس از Ping، رکورد PAT را ثبت کنید.
+**Checkpoint `F-13-pat-translation.png`:** Capture the PAT entry immediately after the Ping.
 
-**Checkpoint `F-14-static-port-forwarding.png`:** دو نگاشت WEB1 روی پورت ۸۰ و WEB2 روی پورت ۸۰۸۰ را ثبت کنید.
+**Checkpoint `F-14-static-port-forwarding.png`:** Capture the two mappings for WEB1 on port 80 and WEB2 on port 8080.
 
 ---
 
-# ۱۱. ACL داخلی سرورها
+# 11. Internal Server ACL
 
-در صورت سؤال عبارت «ACL-SERVERS-IN روی VLAN 100 به‌صورت Inbound» آمده است. روی SVI، جهت `in` ترافیکی را بررسی می‌کند که **از سرورها وارد SW-CORE** می‌شود؛ در حالی که قوانین خواسته‌شده باید درخواست‌های کاربران را **به مقصد سرورها** کنترل کنند. برای اجرای واقعی سیاست، ACL روی `Vlan100` در جهت `out` اعمال می‌شود. این انتخاب با عبارت جهت در PDF یکسان نیست، اما استفاده از `in` امکان اجرای آزمون‌های QA، غیر QA و مدیریت را با ACL مقصدگرا از بین می‌برد. این تناقض را در توضیح ویدیو کوتاه و صریح بیان کنید.
+The assignment states “ACL-SERVERS-IN on VLAN 100 as Inbound.” On an SVI, the `in` direction checks traffic that **enters SW-CORE from the servers**, whereas the requested rules must control user requests **destined for the servers**. To actually enforce the policy, the ACL is applied to `Vlan100` in the `out` direction. This choice does not match the direction stated in the PDF, but using `in` makes it impossible to carry out the QA, non-QA, and management tests with a destination-oriented ACL. State this contradiction briefly and explicitly in the video explanation.
 
-## دستگاه: SW-CORE
+## Device: SW-CORE
 
 ```text
 enable
@@ -779,15 +779,15 @@ end
 write memory
 ```
 
-قاعده ICMP از VLAN 10 به WEB1 فقط برای سازگارشدن با تست اجباری Ping صفحه ۱۲ صورت سؤال اضافه شده است. سایر کاربران عادی فقط HTTP و DNS مجاز را دریافت می‌کنند.
+The ICMP rule from VLAN 10 to WEB1 has been added only to accommodate the mandatory Ping test on page 12 of the assignment. Other ordinary users receive only the permitted HTTP and DNS.
 
-**Checkpoint `F-15-server-acl-config.png`:** ترتیب ACL و اتصال آن به `Vlan100 out` را ثبت کنید.
+**Checkpoint `F-15-server-acl-config.png`:** Capture the ACL order and its attachment to `Vlan100 out`.
 
 ---
 
-# ۱۲. ACL مرزی اینترنت
+# 12. Internet Edge ACL
 
-## دستگاه: R-EDGE
+## Device: R-EDGE
 
 ```text
 enable
@@ -810,25 +810,25 @@ end
 write memory
 ```
 
-دو Permit نخست فقط وب عمومی را باز می‌کنند. سه Permit بعدی پاسخ‌های لازم برای ارتباط‌های PAT آغازشده از داخل را عبور می‌دهند. TEST هیچ نگاشت عمومی ندارد و ترافیک مستقیم به شبکه خصوصی نیز رد می‌شود.
+The first two Permit rules open only the public web. The next three Permit rules allow the responses needed for PAT connections initiated from inside. TEST has no public mapping, and direct traffic to the private network is also denied.
 
-**Checkpoint `F-16-internet-acl-config.png`:** ACL خارجی و اتصال inbound آن به `Gi0/0/0` را ثبت کنید.
+**Checkpoint `F-16-internet-acl-config.png`:** Capture the external ACL and its inbound attachment to `Gi0/0/0`.
 
 ---
 
-# ۱۳. مدیریت SSH/Telnet فقط برای Network Team
+# 13. SSH/Telnet Management for the Network Team Only
 
-Server-PT استاندارد در بسیاری از نسخه‌های Packet Tracer سرویس SSH/Telnet قابل فعال‌سازی ندارد، در حالی که صورت سؤال اتصال به «همان سرور» را می‌خواهد و شکل WEB1 را با HTTP+SSH نشان می‌دهد. این یک محدودیت حل‌ناشدنی مدل Server-PT است و نباید در ویدیو به‌عنوان پیاده‌سازی کامل سرور معرفی شود.
+The standard Server-PT has no SSH/Telnet service that can be enabled in many versions of Packet Tracer, whereas the assignment requires a connection to “the same server” and the diagram shows WEB1 with HTTP+SSH. This is an unresolvable limitation of the Server-PT model and must not be presented in the video as a complete server implementation.
 
-اگر در `WEB1 > Services` گزینه SSH موجود است، آن را On کنید، کاربر `netadmin` با رمز `NetLab32Pass` بسازید و تست‌های عادی و Network Team را مستقیماً با `10.10.100.10` انجام دهید. اگر این گزینه وجود ندارد، اثبات را در دو بخش انجام دهید:
+If the SSH option is available in `WEB1 > Services`, set it to On, create the user `netadmin` with the password `NetLab32Pass`, and perform the ordinary-user and Network Team tests directly with `10.10.100.10`. If this option is not available, perform the demonstration in two parts:
 
-1. در Simulation Mode با **Add Complex PDU** یک بسته TCP با Destination Port برابر 22 از PC-S1 به WEB1 بسازید؛ بسته باید روی SW-CORE توسط ACL حذف شود.
-2. همان بسته را از PC-N1 به WEB1 بسازید؛ ACL باید آن را تا WEB1 عبور دهد، هرچند خود Server-PT به علت نبود سرویس SSH اتصال کاربردی را کامل نمی‌کند.
-3. برای نشان‌دادن یک نشست مدیریتی واقعی، اتصال SSH عادی و Network Team را به مقصد یکسان R-EDGE مقایسه کنید.
+1. In Simulation Mode, use **Add Complex PDU** to create a TCP packet with Destination Port set to 22 from PC-S1 to WEB1; the packet must be dropped on SW-CORE by the ACL.
+2. Create the same packet from PC-N1 to WEB1; the ACL must allow it through to WEB1, although Server-PT itself does not complete the application connection because it lacks an SSH service.
+3. To demonstrate a real management session, compare the ordinary-user and Network Team SSH connections to the same destination, R-EDGE.
 
-این روش هم تصمیم ACL به مقصد سرور را نشان می‌دهد و هم محدودیت شبیه‌ساز را صادقانه از موفقیت نشست SSH جدا می‌کند. سیاست دسترسی مدیریتی تجهیزات شبکه با بلوک‌های زیر اعمال می‌شود.
+This method both demonstrates the ACL decision for the server destination and honestly distinguishes the simulator limitation from the success of the SSH session. The management access policy for network equipment is applied using the following blocks.
 
-## دستگاه: R-EDGE
+## Device: R-EDGE
 
 ```text
 enable
@@ -850,7 +850,7 @@ end
 write memory
 ```
 
-## دستگاه: SW-CORE
+## Device: SW-CORE
 
 ```text
 enable
@@ -872,7 +872,7 @@ end
 write memory
 ```
 
-## دستگاه: SW-F1
+## Device: SW-F1
 
 ```text
 enable
@@ -894,7 +894,7 @@ end
 write memory
 ```
 
-## دستگاه: SW-F2
+## Device: SW-F2
 
 ```text
 enable
@@ -916,7 +916,7 @@ end
 write memory
 ```
 
-## دستگاه: SW-F3
+## Device: SW-F3
 
 ```text
 enable
@@ -938,15 +938,15 @@ end
 write memory
 ```
 
-**Checkpoint `F-17-management-vty-acl.png`:** ACL مدیریت و خطوط VTY روی R-EDGE را ثبت کنید.
+**Checkpoint `F-17-management-vty-acl.png`:** Capture the management ACL and VTY lines on R-EDGE.
 
 ---
 
-# ۱۴. بخش امتیازی محدودیت زمانی Finance
+# 14. Bonus Section: Finance Time Restriction
 
-صورت سؤال ساعت دقیقی تعیین نکرده است. برای نمونه، دسترسی Finance در روزهای کاری از 08:00 تا 18:00 مجاز می‌شود. قبل از اجرا، ساعت Packet Tracer را با سناریوی تست هماهنگ کنید.
+The assignment does not specify exact hours. As an example, Finance access is permitted on weekdays from 08:00 to 18:00. Before execution, synchronize the Packet Tracer clock with the test scenario.
 
-## دستگاه: R-EDGE
+## Device: R-EDGE
 
 ```text
 enable
@@ -966,15 +966,15 @@ end
 write memory
 ```
 
-اگر نسخه Packet Tracer دستور `time-range` را پشتیبانی نمی‌کند، این بخش امتیازی را اجرا نکنید و پیکربندی اصلی PAT را نگه دارید.
+If the Packet Tracer version does not support the `time-range` command, do not implement this bonus section and retain the original PAT configuration.
 
 ---
 
-# ۱۵. تست‌های اجباری به‌ترتیب ویدیو
+# 15. Mandatory Tests in Video Order
 
-## تست ۱ — VLAN، Trunk و SVI
+## Test 1 — VLAN, Trunk, and SVI
 
-### دستگاه: SW-CORE
+### Device: SW-CORE
 
 ```text
 enable
@@ -983,24 +983,24 @@ show interfaces trunk
 show ip interface brief
 ```
 
-مواردی که باید در ویدیو خوانا باشند:
+Items that must be readable in the video:
 
-- همه VLANها ایجاد شده‌اند.
-- `Fa0/21`، `Fa0/22` و `Fa0/23` Trunk هستند.
-- Native VLAN هر سه لینک `999` است.
-- SVIهای کاربری و Server Farm آدرس صحیح دارند.
+- All VLANs have been created.
+- `Fa0/21`, `Fa0/22`, and `Fa0/23` are Trunk ports.
+- The Native VLAN of all three links is `999`.
+- The user and Server Farm SVIs have the correct addresses.
 
 **Checkpoint `F-18-video-vlan-trunk-svi.png`**
 
-## تست ۲ — DHCP روی دو VLAN متفاوت
+## Test 2 — DHCP on Two Different VLANs
 
-### دستگاه: PC-S1
+### Device: PC-S1
 
 ```text
 ipconfig
 ```
 
-انتظار در پروژه تازه:
+Expected in a fresh project:
 
 ```text
 IP: 10.10.10.2/28
@@ -1008,13 +1008,13 @@ Gateway: 10.10.10.1
 DNS: 10.10.100.13
 ```
 
-### دستگاه: PC-Q1
+### Device: PC-Q1
 
 ```text
 ipconfig
 ```
 
-انتظار در پروژه تازه:
+Expected in a fresh project:
 
 ```text
 IP: 10.10.22.2/28
@@ -1022,11 +1022,11 @@ Gateway: 10.10.22.1
 DNS: 10.10.100.13
 ```
 
-**Checkpoint `F-19-video-dhcp-two-vlans.png`:** دو خروجی را به‌صورت `-a` برای PC-S1 و `-b` برای PC-Q1 ثبت کنید؛ IP، Mask، Gateway و DNS باید کامل خوانا باشند.
+**Checkpoint `F-19-video-dhcp-two-vlans.png`:** Capture the two outputs as `-a` for PC-S1 and `-b` for PC-Q1; the IP, Mask, Gateway, and DNS must be fully readable.
 
-## تست ۳ — Routing و OSPF
+## Test 3 — Routing and OSPF
 
-### دستگاه: SW-CORE
+### Device: SW-CORE
 
 ```text
 enable
@@ -1034,55 +1034,55 @@ show ip route
 show ip ospf neighbor
 ```
 
-### دستگاه: PC-S1
+### Device: PC-S1
 
 ```text
 ping 10.10.22.2
 ping 10.10.100.10
 ```
 
-هر دو Ping باید موفق باشند. Ping دوم توسط استثنای مشخص ACL برای تست اجباری مجاز شده است.
+Both Pings must succeed. The second Ping is permitted by the specific ACL exception for the mandatory test.
 
-**Checkpoint `F-20-video-ospf-and-pings.png`:** از `-a` برای Route/Neighbor روی SW-CORE و `-b` برای دو Ping موفق PC-S1 استفاده کنید.
+**Checkpoint `F-20-video-ospf-and-pings.png`:** Use `-a` for Route/Neighbor on SW-CORE and `-b` for the two successful PC-S1 Pings.
 
-## تست ۴ — DNS و صفحات داخلی
+## Test 4 — DNS and Internal Pages
 
-### دستگاه: PC-S1
+### Device: PC-S1
 
 ```text
 nslookup www.netlab.ir
 nslookup backup.netlab.ir
 ```
 
-نتایج مورد انتظار:
+Expected results:
 
 ```text
 www.netlab.ir -> 10.10.100.10
 backup.netlab.ir -> 10.10.100.11
 ```
 
-سپس در `Desktop > Web Browser` همین PC باز کنید:
+Then open the following in `Desktop > Web Browser` on this same PC:
 
 ```text
 http://www.netlab.ir
 http://backup.netlab.ir
 ```
 
-صفحه WEB1 و WEB2 باید بدون استفاده از IP باز شوند.
+The WEB1 and WEB2 pages must open without using the IP.
 
 **Checkpoint `F-21-video-internal-dns.png`**
 
 **Checkpoint `F-22-video-internal-web-pages.png`**
 
-## تست ۵ — PAT
+## Test 5 — PAT
 
-### دستگاه: PC-S1
+### Device: PC-S1
 
 ```text
 ping 203.0.113.1
 ```
 
-### دستگاه: R-EDGE
+### Device: R-EDGE
 
 ```text
 enable
@@ -1090,71 +1090,71 @@ show ip nat translations
 show ip nat statistics
 ```
 
-رکورد PAT باید Inside Global برابر `203.0.113.10` داشته باشد. چون ترجمه ICMP سریع منقضی می‌شود، جدول NAT را بلافاصله نمایش دهید.
+The PAT entry must have an Inside Global of `203.0.113.10`. Since the ICMP translation expires quickly, display the NAT table immediately.
 
 **Checkpoint `F-23-video-pat.png`**
 
-## تست ۶ — Static NAT از Internet-User
+## Test 6 — Static NAT from Internet-User
 
-در Web Browser دستگاه `Internet-User` ابتدا دو URL الزام‌شده در صورت سؤال را به‌ترتیب باز کنید:
+In the Web Browser on `Internet-User`, first open the two URLs required by the assignment in order:
 
 ```text
 http://www.techcorp.ir
 http://backup.techcorp.ir:8080
 ```
 
-نتیجه مورد انتظار:
+Expected result:
 
-- URL اول صفحه `NetLab WEB1 Production` را باز کند.
-- URL دوم با پورت ۸۰۸۰ صفحه `NetLab WEB2 Backup Portal` را باز کند.
+- The first URL should open the `NetLab WEB1 Production` page.
+- The second URL, with port 8080, should open the `NetLab WEB2 Backup Portal` page.
 
-برای نشان‌دادن سازگاری با نام دامنه اصلی شرکت، این دو نام نیز باید همان نتایج را بدهند:
+To demonstrate compatibility with the company’s primary domain name, these two names must also produce the same results:
 
 ```text
 http://www.netlab.ir
 http://backup.netlab.ir:8080
 ```
 
-### دستگاه: R-EDGE
+### Device: R-EDGE
 
 ```text
 enable
 show ip nat translations
 ```
 
-**Checkpoint `F-24-video-public-web1.png`:** صفحه WEB1 و نوار آدرس شامل `http://www.techcorp.ir` باید هم‌زمان خوانا باشند.
+**Checkpoint `F-24-video-public-web1.png`:** The WEB1 page and the address bar containing `http://www.techcorp.ir` must be readable simultaneously.
 
-**Checkpoint `F-25-video-public-web2.png`:** صفحه WEB2 و نوار آدرس شامل `http://backup.techcorp.ir:8080` باید هم‌زمان خوانا باشند.
+**Checkpoint `F-25-video-public-web2.png`:** The WEB2 page and the address bar containing `http://backup.techcorp.ir:8080` must be readable simultaneously.
 
 **Checkpoint `F-26-video-static-nat-table.png`**
 
-## تست ۷ — QA به TEST باید مجاز باشد
+## Test 7 — QA Access to TEST Must Be Allowed
 
-روی Web Browser دستگاه `PC-Q1` باز کنید:
+Open the following in the Web Browser on `PC-Q1`:
 
 ```text
 http://test.netlab.ir
 ```
 
-صفحه `NetLab Internal TEST Server` باید باز شود.
+The `NetLab Internal TEST Server` page must open.
 
 **Checkpoint `F-27-video-qa-test-allowed.png`**
 
-## تست ۸ — کاربر غیر QA به TEST باید مسدود شود
+## Test 8 — Non-QA User Access to TEST Must Be Blocked
 
-روی Web Browser دستگاه `PC-S1` باز کنید:
+Open the following in the Web Browser on `PC-S1`:
 
 ```text
 http://test.netlab.ir
 ```
 
-DNS باید نام را به `10.10.100.12` تبدیل کند، اما صفحه نباید باز شود. این تفاوت نشان می‌دهد مشکل از DNS نیست و ACL دسترسی را مسدود کرده است.
+DNS must resolve the name to `10.10.100.12`, but the page must not open. This difference shows that the problem is not DNS and that the ACL has blocked access.
 
 **Checkpoint `F-28-video-nonqa-test-blocked.png`**
 
-## تست ۹ — مسیر SSH کاربر عادی به WEB1 رد شود
+## Test 9 — The Ordinary User’s SSH Path to WEB1 Must Be Denied
 
-در **Simulation Mode** یک **Add Complex PDU** بسازید:
+In **Simulation Mode**, create an **Add Complex PDU**:
 
 ```text
 Source Device: PC-S1
@@ -1165,21 +1165,21 @@ Destination Port: 22
 One Shot
 ```
 
-بسته باید روی SW-CORE توسط ACL حذف شود و شمارنده قاعده منع SSH افزایش یابد. سپس برای اثبات ردشدن نشست واقعی مدیریت تجهیزات اجرا کنید:
+The packet must be dropped on SW-CORE by the ACL, and the SSH deny rule counter must increase. Then, to demonstrate that a real equipment management session is denied, run:
 
-### دستگاه: PC-S1
+### Device: PC-S1
 
 ```text
 ssh -l netadmin 10.10.0.1
 ```
 
-اتصال به R-EDGE باید به دلیل `MGMT-VTY` رد یا Timeout شود.
+The connection to R-EDGE must be denied or Timeout because of `MGMT-VTY`.
 
-**Checkpoint `F-29-video-ordinary-ssh-denied.png`:** در صورت نیاز نام پایه را با پسوند `-a` برای Drop بسته به WEB1 و `-b` برای رد نشست R-EDGE تقسیم کنید.
+**Checkpoint `F-29-video-ordinary-ssh-denied.png`:** If needed, split the base name using the suffix `-a` for the packet Drop to WEB1 and `-b` for the denied R-EDGE session.
 
-## تست ۱۰ — مسیر SSH تیم Network به همان WEB1 مجاز باشد
+## Test 10 — The Network Team’s SSH Path to the Same WEB1 Must Be Allowed
 
-در **Simulation Mode** همان Complex PDU را این بار با مبدأ PC-N1 بسازید:
+In **Simulation Mode**, create the same Complex PDU, this time with PC-N1 as the source:
 
 ```text
 Source Device: PC-N1
@@ -1190,59 +1190,59 @@ Destination Port: 22
 One Shot
 ```
 
-بسته باید از ACL عبور کند و به WEB1 برسد. اگر سرویس SSH روی WEB1 در نسخه شما موجود است، تست واقعی را نیز مستقیماً اجرا کنید:
+The packet must pass through the ACL and reach WEB1. If the SSH service on WEB1 is available in your version, also perform the real test directly:
 
-### دستگاه: PC-N1
+### Device: PC-N1
 
 ```text
 ssh -l netadmin 10.10.100.10
 ```
 
-اگر Server-PT سرویس SSH ندارد، برای اثبات نشست مدیریتی واقعی روی تجهیزات از همان PC اجرا کنید:
+If Server-PT has no SSH service, run the following from the same PC to demonstrate a real management session on the equipment:
 
-### دستگاه: PC-N1
+### Device: PC-N1
 
 ```text
 ssh -l netadmin 10.10.0.1
 ```
 
-رمز آزمایش:
+Test password:
 
 ```text
 NetLab32Pass
 ```
 
-اتصال R-EDGE باید برقرار شود. پس از مشاهده Prompt دستگاه، با `exit` خارج شوید. در ویدیو صریحاً بگویید رسیدن PDU تیم Network به WEB1 مجازبودن ACL سرور را ثابت می‌کند، اما کامل‌شدن نشست کاربردی WEB1 به وجود سرویس SSH در مدل Server-PT وابسته است.
+The R-EDGE connection must be established. After seeing the device Prompt, leave with `exit`. Explicitly state in the video that the Network team’s PDU reaching WEB1 proves that the server ACL permits it, but completing the WEB1 application session depends on the presence of an SSH service in the Server-PT model.
 
-**Checkpoint `F-30-video-network-ssh-allowed.png`:** در صورت نیاز نام پایه را با پسوند `-a` برای رسیدن بسته به WEB1 و `-b` برای نشست موفق R-EDGE تقسیم کنید.
+**Checkpoint `F-30-video-network-ssh-allowed.png`:** If needed, split the base name using the suffix `-a` for the packet reaching WEB1 and `-b` for the successful R-EDGE session.
 
-## تست ۱۱ — Internet-User به TEST باید مسدود شود
+## Test 11 — Internet-User Access to TEST Must Be Blocked
 
-### دستگاه: Internet-User
+### Device: Internet-User
 
 ```text
 nslookup test.netlab.ir
 ping 10.10.100.12
 ```
 
-نتیجه مورد انتظار:
+Expected result:
 
-- `test.netlab.ir` در DNS خارجی رکورد ندارد.
-- Ping مستقیم به IP خصوصی TEST نیز توسط ACL خارجی R-EDGE رد می‌شود.
-- هیچ URL یا Port Forwarding عمومی برای TEST وجود ندارد.
+- `test.netlab.ir` has no record in the external DNS.
+- A direct Ping to the private IP of TEST is also denied by the external ACL on R-EDGE.
+- No public URL or Port Forwarding exists for TEST.
 
 **Checkpoint `F-31-video-internet-test-blocked.png`**
 
-## تست ۱۲ — شمارنده‌های ACL
+## Test 12 — ACL Counters
 
-### دستگاه: SW-CORE
+### Device: SW-CORE
 
 ```text
 enable
 show access-lists ACL-SERVERS-IN
 ```
 
-### دستگاه: R-EDGE
+### Device: R-EDGE
 
 ```text
 enable
@@ -1250,23 +1250,23 @@ show access-lists INTERNET-IN
 show access-lists MGMT-VTY
 ```
 
-Permit و Denyهایی که در تست‌های قبلی استفاده شدند باید شمارنده داشته باشند.
+The Permit and Deny rules used in the previous tests must have counters.
 
-**Checkpoint `F-32-video-acl-counters.png`:** خروجی SW-CORE را در `-a` و دو ACL دستگاه R-EDGE را در `-b` ثبت کنید؛ شماره Matchهای Permit و Deny باید خوانا باشند.
+**Checkpoint `F-32-video-acl-counters.png`:** Capture the SW-CORE output in `-a` and the two R-EDGE ACLs in `-b`; the Permit and Deny Match counts must be readable.
 
 ---
 
-# ۱۶. عیب‌یابی کوتاه
+# 16. Brief Troubleshooting
 
-## اگر SVI پایین است
+## If an SVI Is Down
 
-- حداقل یک پورت Access یا Trunk حامل آن VLAN باید `up` باشد.
-- VLAN باید روی SW-CORE و Access Switch مربوطه وجود داشته باشد.
-- Native VLAN هر دو سمت Trunk باید `999` باشد.
+- At least one Access or Trunk port carrying that VLAN must be `up`.
+- The VLAN must exist on SW-CORE and the corresponding Access Switch.
+- The Native VLAN on both sides of the Trunk must be `999`.
 
-## اگر DHCP کار نمی‌کند
+## If DHCP Does Not Work
 
-### دستگاه: SW-CORE
+### Device: SW-CORE
 
 ```text
 enable
@@ -1275,11 +1275,11 @@ show ip dhcp binding
 show ip interface brief
 ```
 
-بررسی کنید SVI VLAN موردنظر `up/up` و Pool دارای آدرس آزاد باشد.
+Check that the SVI of the relevant VLAN is `up/up` and that the Pool has a free address.
 
-## اگر OSPF همسایه ندارد
+## If OSPF Has No Neighbor
 
-### دستگاه: SW-CORE
+### Device: SW-CORE
 
 ```text
 enable
@@ -1287,7 +1287,7 @@ show ip ospf interface GigabitEthernet0/1
 show ip ospf neighbor
 ```
 
-### دستگاه: R-EDGE
+### Device: R-EDGE
 
 ```text
 enable
@@ -1295,17 +1295,17 @@ show ip ospf interface GigabitEthernet0/0/1
 show ip ospf neighbor
 ```
 
-هر دو سمت باید در `10.10.0.0/30` و Area 0 باشند.
+Both sides must be in `10.10.0.0/30` and Area 0.
 
-## اگر WEB2 از اینترنت باز نمی‌شود
+## If WEB2 Does Not Open from the Internet
 
-- URL باید حتماً پورت `8080` داشته باشد.
-- نگاشت داخلی WEB2 همچنان به پورت `80` است.
-- ACL خارجی باید پورت مقصد `8080` روی `203.0.113.20` را مجاز کند.
+- The URL must include port `8080`.
+- The internal WEB2 mapping is still to port `80`.
+- The external ACL must permit destination port `8080` on `203.0.113.20`.
 
-## اگر NAT Table خالی است
+## If the NAT Table Is Empty
 
-ابتدا از یک PC داخلی `203.0.113.1` را Ping کنید و بلافاصله روی R-EDGE اجرا کنید:
+First Ping `203.0.113.1` from an internal PC and immediately run the following on R-EDGE:
 
 ```text
 enable
@@ -1314,82 +1314,82 @@ show ip nat translations
 
 ---
 
-# ۱۷. ترتیب پیشنهادی ویدیوی حداکثر ۱۰ دقیقه
+# 17. Suggested Sequence for a Video of at Most 10 Minutes
 
-| زمان تقریبی | نمایش |
+| Approximate Time | Display |
 |---|---|
-| ۰:۰۰ تا ۰:۴۵ | نمای کامل توپولوژی و معماری Edge/Core/Access |
-| ۰:۴۵ تا ۱:۴۵ | VLAN، Trunk و SVI روی SW-CORE |
-| ۱:۴۵ تا ۲:۳۰ | DHCP روی دو کلاینت از دو VLAN |
-| ۲:۳۰ تا ۳:۳۰ | OSPF، Route و دو Ping اجباری |
-| ۳:۳۰ تا ۴:۳۰ | nslookup و صفحات داخلی با نام دامنه |
-| ۴:۳۰ تا ۵:۳۰ | PAT و جدول ترجمه‌ها |
-| ۵:۳۰ تا ۶:۳۰ | WEB1 و WEB2 از Internet-User |
-| ۶:۳۰ تا ۸:۱۵ | QA مجاز، غیر QA مسدود، TEST خارجی مسدود |
-| ۸:۱۵ تا ۹:۱۵ | SSH کاربر عادی و Network Team |
-| ۹:۱۵ تا ۱۰:۰۰ | شمارنده‌های ACL و جمع‌بندی |
+| 0:00 to 0:45 | Full view of the topology and Edge/Core/Access architecture |
+| 0:45 to 1:45 | VLAN, Trunk, and SVI on SW-CORE |
+| 1:45 to 2:30 | DHCP on two clients from two VLANs |
+| 2:30 to 3:30 | OSPF, Route, and the two mandatory Pings |
+| 3:30 to 4:30 | nslookup and internal pages by domain name |
+| 4:30 to 5:30 | PAT and the translation table |
+| 5:30 to 6:30 | WEB1 and WEB2 from Internet-User |
+| 6:30 to 8:15 | QA allowed, non-QA blocked, external TEST blocked |
+| 8:15 to 9:15 | Ordinary-user and Network Team SSH |
+| 9:15 to 10:00 | ACL counters and summary |
 
 ---
 
-# ۱۸. چک‌لیست کامل نهایی
+# 18. Complete Final Checklist
 
-## توپولوژی و لایه ۲
+## Topology and Layer 2
 
-- [ ] R-EDGE و ISP از مدل ISR 4321 هستند.
-- [ ] SW-CORE از مدل 3560-24PS است.
-- [ ] هر طبقه یک 2960 مستقل دارد.
-- [ ] هجده PC داخلی، چهار سرور داخلی و یک Internet-User وجود دارند.
-- [ ] همه VLANهای ۱۰، ۱۱، ۱۲، ۲۰، ۲۱، ۲۲، ۳۰، ۳۱، ۳۲، ۹۹، ۱۰۰ و ۹۹۹ ساخته شده‌اند.
-- [ ] پورت‌های کاربران Access و در VLAN درست هستند.
-- [ ] سه Trunk فعال‌اند.
-- [ ] Native VLAN در هر دو سمت همه Trunkها ۹۹۹ است.
+- [ ] R-EDGE and ISP are ISR 4321 models.
+- [ ] SW-CORE is a 3560-24PS model.
+- [ ] Each floor has an independent 2960.
+- [ ] There are eighteen internal PCs, four internal servers, and one Internet-User.
+- [ ] All VLANs 10, 11, 12, 20, 21, 22, 30, 31, 32, 99, 100, and 999 have been created.
+- [ ] User ports are Access and in the correct VLAN.
+- [ ] Three Trunks are active.
+- [ ] The Native VLAN on both sides of all Trunks is 999.
 
-## لایه ۳ و سرویس‌ها
+## Layer 3 and Services
 
-- [ ] همه SVIها Gateway دقیق جدول را دارند.
-- [ ] لینک CORE به EDGE برابر `10.10.0.0/30` است.
-- [ ] OSPF Process 1 و Area 0 روی هر دو دستگاه فعال است.
-- [ ] همسایگی OSPF در وضعیت FULL است.
-- [ ] Default Route از R-EDGE در OSPF منتشر شده است.
-- [ ] برای هر VLAN کاربری یک DHCP Pool وجود دارد.
-- [ ] Lease برابر ۲۴ ساعت و DNS برابر `10.10.100.13` است.
-- [ ] اعضای Network Team و سرورها Static هستند.
-- [ ] پنج رکورد داخلی DNS ساخته شده‌اند.
-- [ ] TEST در DNS عمومی رکورد ندارد.
+- [ ] All SVIs have the exact Gateway from the table.
+- [ ] The CORE-to-EDGE link is `10.10.0.0/30`.
+- [ ] OSPF Process 1 and Area 0 are enabled on both devices.
+- [ ] The OSPF adjacency is in the FULL state.
+- [ ] The Default Route from R-EDGE has been advertised in OSPF.
+- [ ] There is one DHCP Pool for each user VLAN.
+- [ ] Lease is 24 hours and DNS is `10.10.100.13`.
+- [ ] Network Team members and servers are Static.
+- [ ] Five internal DNS records have been created.
+- [ ] TEST has no record in the public DNS.
 
-## NAT و امنیت
+## NAT and Security
 
-- [ ] PAT همه VLANهای کاربری را به `203.0.113.10` ترجمه می‌کند.
-- [ ] `203.0.113.20:80` به `WEB1:80` می‌رود.
-- [ ] `203.0.113.20:8080` به `WEB2:80` می‌رود.
-- [ ] هیچ NAT برای TEST وجود ندارد.
-- [ ] QA از طریق HTTP به TEST دسترسی دارد.
-- [ ] غیر QA به TEST دسترسی ندارد.
-- [ ] Finance در شبکه داخلی فقط HTTP و DNS مجاز به سمت Server Farm دارد، به TEST دسترسی ندارد و در اینترنت نیز فقط HTTP و DNS آن از PAT عبور می‌کند.
-- [ ] فقط Network Team اجازه مدیریت SSH/Telnet تجهیزات را دارد.
-- [ ] ACL خارجی فقط وب عمومی و پاسخ‌های لازم PAT را عبور می‌دهد.
+- [ ] PAT translates all user VLANs to `203.0.113.10`.
+- [ ] `203.0.113.20:80` goes to `WEB1:80`.
+- [ ] `203.0.113.20:8080` goes to `WEB2:80`.
+- [ ] There is no NAT for TEST.
+- [ ] QA has access to TEST through HTTP.
+- [ ] Non-QA has no access to TEST.
+- [ ] On the internal network, Finance has only permitted HTTP and DNS toward the Server Farm, has no access to TEST, and on the internet, only its HTTP and DNS pass through PAT.
+- [ ] Only the Network Team is allowed SSH/Telnet management of the equipment.
+- [ ] The external ACL allows only public web and the necessary PAT responses through.
 
-## تست‌ها و تحویل
+## Tests and Submission
 
-- [ ] `show vlan brief` ثبت شده است.
-- [ ] `show interfaces trunk` ثبت شده است.
-- [ ] `show ip interface brief` ثبت شده است.
-- [ ] `ipconfig` دو VLAN ثبت شده است.
-- [ ] `show ip route` و `show ip ospf neighbor` ثبت شده‌اند.
-- [ ] Ping از VLAN 10 به VLAN 22 موفق است.
-- [ ] Ping از VLAN 10 به WEB1 موفق است.
-- [ ] هر دو nslookup موفق‌اند.
-- [ ] هر دو صفحه داخلی با نام دامنه باز می‌شوند.
-- [ ] رکورد PAT نمایش داده شده است.
-- [ ] WEB1 و WEB2 از Internet-User باز می‌شوند.
-- [ ] QA به TEST مجاز و غیر QA مسدود است.
-- [ ] SSH کاربر عادی رد و SSH Network Team برقرار است.
-- [ ] TEST از اینترنت قابل دسترسی نیست.
-- [ ] شمارنده‌های ACL نمایش داده شده‌اند.
-- [ ] فایل نهایی `.pkt` ذخیره شده است.
-- [ ] ویدیو حداکثر ۱۰ دقیقه است و تست‌ها را به‌ترتیب نشان می‌دهد.
+- [ ] `show vlan brief` has been captured.
+- [ ] `show interfaces trunk` has been captured.
+- [ ] `show ip interface brief` has been captured.
+- [ ] `ipconfig` for two VLANs has been captured.
+- [ ] `show ip route` and `show ip ospf neighbor` have been captured.
+- [ ] Ping from VLAN 10 to VLAN 22 is successful.
+- [ ] Ping from VLAN 10 to WEB1 is successful.
+- [ ] Both nslookup tests are successful.
+- [ ] Both internal pages open by domain name.
+- [ ] The PAT entry has been displayed.
+- [ ] WEB1 and WEB2 open from Internet-User.
+- [ ] QA is allowed to access TEST and non-QA is blocked.
+- [ ] Ordinary-user SSH is denied and Network Team SSH is established.
+- [ ] TEST is not accessible from the internet.
+- [ ] The ACL counters have been displayed.
+- [ ] The final `.pkt` file has been saved.
+- [ ] The video is at most 10 minutes and shows the tests in order.
 
-## فهرست ۳۲ Checkpoint
+## List of 32 Checkpoints
 
 - [ ] `F-01-topology.png`
 - [ ] `F-02-edge-isp-links.png`
